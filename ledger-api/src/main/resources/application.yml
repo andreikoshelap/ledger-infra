@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: ledger
+  datasource:
+    url: jdbc:h2:mem:ledgerdb;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      # Schema is generated from entities (incl. @Check constraints) so the app
+      # boots out-of-the-box. For a Flyway-managed schema set this to "none" and
+      # flyway.enabled to true.
+      ddl-auto: create-drop
+    open-in-view: false
+    properties:
+      hibernate.format_sql: true
+    show-sql: false
+  flyway:
+    enabled: false
+    locations: classpath:db/migration
+  h2:
+    console:
+      enabled: true
+
+ledger:
+  external-logging:
+    # Simulated external system that must be called before every debit.
+    base-url: https://httpstat.us
+    path: /200
+    connect-timeout-ms: 2000
+    read-timeout-ms: 2000

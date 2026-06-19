@@ -1,0 +1,16 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:ledgerdb;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000
+    hikari:
+      # Larger than the concurrency-test thread count so connection acquisition
+      # never competes with pessimistic row locks.
+      maximum-pool-size: 20
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+
+ledger:
+  external-logging:
+    base-url: http://localhost:0
+    path: /200
