@@ -22,9 +22,9 @@ class H2ConsoleTest {
         System.out.println("[DEBUG_LOG] Found " + beans.size() + " ServletRegistrationBeans:");
         beans.forEach((name, bean) -> System.out.println("[DEBUG_LOG] Bean: " + name + ", Servlet: " + bean.getServletName()));
         
-        boolean found = beans.values().stream()
-                .anyMatch(reg -> reg.getServletName().toLowerCase().contains("h2"));
-        
+        boolean found = beans.keySet().stream()
+                .anyMatch(name -> name.toLowerCase().contains("h2"));
+
         assertTrue(found, "H2 Console Servlet should be registered");
     }
 }
