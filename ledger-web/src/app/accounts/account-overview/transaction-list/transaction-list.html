@@ -1,1 +1,18 @@
-<p>transaction-list works!</p>
+<ul class="txns">
+  @for (e of entries(); track e.id) {
+    <li>
+      <a class="txn" [routerLink]="['/accounts', accountId(), 'tx', e.id]">
+        <span class="txn__type">{{ e.type }}</span>
+        <span class="txn__amount">{{ formatMoney(e.amount, e.currency) }}</span>
+        <span class="txn__after">bal {{ formatMoney(e.balanceAfter, e.currency) }}</span>
+        <time class="txn__date">{{ e.createdAt | date:'short' }}</time>
+      </a>
+    </li>
+  }
+</ul>
+
+@if (hasMore()) {
+  <div class="sentinel" appIntersect (intersect)="loadMore.emit()">
+    {{ loadingMore() ? 'Loading…' : '' }}
+  </div>
+}

@@ -1,0 +1,11 @@
+.page-header { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+.state { color: #555; }
+.state--error { color: #b00020; }
+.accounts { list-style: none; padding: 0; display: grid; gap: 0.75rem;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.account-card { display: grid; gap: 0.25rem; padding: 1rem; border: 1px solid #ddd;
+  border-radius: 8px; text-decoration: none; color: inherit; }
+.account-card:hover { border-color: #888; }
+.account-card__currency { font-size: 0.8rem; letter-spacing: 0.05em; color: #777; }
+.account-card__balance { font-size: 1.4rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.account-card__id { font-size: 0.75rem; color: #999; }

@@ -6,6 +6,7 @@ import com.gattopiccolo.ledger.domain.CurrencyCode;
 import com.gattopiccolo.ledger.domain.TransactionType;
 import com.gattopiccolo.ledger.exception.AccountNotFoundException;
 import com.gattopiccolo.ledger.exception.InvalidAmountException;
+import com.gattopiccolo.ledger.exception.TransactionNotFoundException;
 import com.gattopiccolo.ledger.money.ExchangeRateProvider;
 import com.gattopiccolo.ledger.repository.AccountRepository;
 import com.gattopiccolo.ledger.repository.AccountTransactionRepository;
@@ -77,6 +78,14 @@ public class AccountService {
         List<TransactionView> items = rows.stream().map(TransactionView::of).toList();
         Long next = (items.size() == size) ? items.get(items.size() - 1).id() : null;
         return new TransactionPage(items, next);
+    }
+
+    @Transactional(readOnly = true)
+    public TransactionView getTransaction(Long accountId, Long entryId) {
+        load(accountId); // 404 early if the account does not exist
+        return transactions.findByIdAndAccountId(entryId, accountId)
+                .map(TransactionView::of)
+                .orElseThrow(() -> new TransactionNotFoundException(entryId));
     }
 
     // ----- money mutations -------------------------------------------------

@@ -1,1 +1,24 @@
-<p>accounts-page works!</p>
+<header class="page-header">
+  <h1>Accounts</h1>
+  <button type="button" (click)="store.load()" [disabled]="store.loading()">Refresh</button>
+</header>
+
+@if (store.loading()) {
+  <p class="state">Loading accounts…</p>
+} @else if (store.error()) {
+  <p class="state state--error">{{ store.error() }}</p>
+} @else if (store.isEmpty()) {
+  <p class="state">No accounts yet.</p>
+} @else {
+  <ul class="accounts">
+    @for (account of store.entities(); track account.id) {
+      <li>
+        <a class="account-card" [routerLink]="['/accounts', account.id]">
+          <span class="account-card__currency">{{ account.currency }}</span>
+          <span class="account-card__balance">{{ formatMoney(account.balance, account.currency) }}</span>
+          <span class="account-card__id">#{{ account.id }}</span>
+        </a>
+      </li>
+    }
+  </ul>
+}

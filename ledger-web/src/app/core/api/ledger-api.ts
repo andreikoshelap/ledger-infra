@@ -6,8 +6,7 @@ import { AccountSummary, LedgerEntry, TransactionPage } from '../models/ledger';
 @Injectable({ providedIn: 'root' })
 export class LedgerApi {
   private readonly http = inject(HttpClient);
-  private readonly base = '/api';          // относительный — dev-прокси и nginx делают same-origin
-
+  private readonly base = '/api';
   listAccounts(): Observable<AccountSummary[]> {
     return this.http.get<AccountSummary[]>(`${this.base}/accounts`);
   }

@@ -1,1 +1,26 @@
-<p>account-overview-page works!</p>
+<a class="back" routerLink="/">← Accounts</a>
+
+@if (store.loading()) {
+  <p class="state">Loading…</p>
+} @else if (store.error()) {
+  <p class="state state--error">{{ store.error() }}</p>
+} @else if (store.account(); as acc) {
+  <header class="acc-header">
+    <span class="acc-header__currency">{{ acc.currency }}</span>
+    <span class="acc-header__balance">{{ formatMoney(acc.balance, acc.currency) }}</span>
+    <span class="acc-header__id">#{{ acc.id }}</span>
+  </header>
+
+  <!-- сюда на следующем срезе встанет <app-balance-chart [series]="store.balanceSeries()" /> -->
+
+  @if (store.isEmpty()) {
+    <p class="state">No transactions yet.</p>
+  } @else {
+    <app-transaction-list
+      [entries]="store.entries()"
+      [hasMore]="store.hasMore()"
+      [loadingMore]="store.loadingMore()"
+      [accountId]="accountId()"
+      (loadMore)="store.loadMore()" />
+  }
+}

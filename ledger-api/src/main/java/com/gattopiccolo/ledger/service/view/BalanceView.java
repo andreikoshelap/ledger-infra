@@ -5,7 +5,7 @@ import com.gattopiccolo.ledger.domain.CurrencyCode;
 
 import java.math.BigDecimal;
 
-public record BalanceView(Long accountId, CurrencyCode currency, BigDecimal balance) {
+public record BalanceView(Long id, CurrencyCode currency, BigDecimal balance) {
 
     public static BalanceView of(Account account) {
         return new BalanceView(

@@ -9,6 +9,7 @@ import java.time.Instant;
 
 public record TransactionView(
         Long id,
+        Long transactionId,
         Long accountId,
         TransactionType type,
         BigDecimal amount,
@@ -21,6 +22,9 @@ public record TransactionView(
     public static TransactionView of(AccountTransaction t) {
         CurrencyCode c = t.getCurrency();
         return new TransactionView(
+                t.getId(),
+                // The domain has no separate transaction-grouping id (an exchange is
+                // two independent entries), so each entry is its own transaction.
                 t.getId(),
                 t.getAccount().getId(),
                 t.getType(),
