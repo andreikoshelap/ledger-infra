@@ -4,7 +4,7 @@ import com.gattopiccolo.ledger.service.AccountService;
 import com.gattopiccolo.ledger.service.view.BalanceView;
 import com.gattopiccolo.ledger.service.view.TransactionPage;
 import com.gattopiccolo.ledger.service.view.TransactionView;
-import com.gattopiccolo.ledger.web.dto.AccountResponse;
+import com.gattopiccolo.ledger.web.dto.AmountRequest;
 import com.gattopiccolo.ledger.web.dto.OpenAccountRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -57,13 +57,19 @@ public class AccountController {
     }
 
     @PostMapping
-    ResponseEntity<AccountResponse> open(
+    ResponseEntity<BalanceView> open(
             @RequestHeader("X-User-Id") long userId,
             @Valid @RequestBody OpenAccountRequest body,
             UriComponentsBuilder uri) {
 
-        AccountResponse created = accountService.open(userId, body.currency());
+        BalanceView created = accountService.open(userId, body.currency());
         URI location = uri.path("/api/accounts/{id}").build(created.id());
         return ResponseEntity.created(location).body(created); // 201 + Location
+    }
+
+    @PostMapping("/{id}/deposit")
+    public TransactionView deposit(@PathVariable Long id,
+                                   @Valid @RequestBody AmountRequest body) {
+        return accountService.deposit(id, body.amount());
     }
 }

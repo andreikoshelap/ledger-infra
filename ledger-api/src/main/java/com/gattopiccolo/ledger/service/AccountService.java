@@ -1,10 +1,6 @@
 package com.gattopiccolo.ledger.service;
 
-import com.gattopiccolo.ledger.domain.Account;
-import com.gattopiccolo.ledger.domain.AccountType;
-import com.gattopiccolo.ledger.domain.AccountTransaction;
-import com.gattopiccolo.ledger.domain.CurrencyCode;
-import com.gattopiccolo.ledger.domain.TransactionType;
+import com.gattopiccolo.ledger.domain.*;
 import com.gattopiccolo.ledger.exception.AccountNotFoundException;
 import com.gattopiccolo.ledger.exception.InvalidAmountException;
 import com.gattopiccolo.ledger.exception.TransactionNotFoundException;
@@ -15,7 +11,6 @@ import com.gattopiccolo.ledger.service.view.BalanceView;
 import com.gattopiccolo.ledger.service.view.ExchangeResult;
 import com.gattopiccolo.ledger.service.view.TransactionPage;
 import com.gattopiccolo.ledger.service.view.TransactionView;
-import com.gattopiccolo.ledger.web.dto.AccountResponse;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -24,7 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.List;
 
 @Service
@@ -184,9 +178,10 @@ public class AccountService {
         }
         return Math.min(Math.max(limit, 1), MAX_PAGE_SIZE);
     }
+
     @Transactional
-    public AccountResponse open(long userId, CurrencyCode currency) {
-        Account saved = accounts.save(Account.open(userId, currency, AccountType.CUSTOMER));
-        return AccountResponse.from(saved);
+    public BalanceView open(long userId, CurrencyCode currency) {
+        Account saved = accounts.save(Account.open(userId, currency));
+        return BalanceView.of(saved);
     }
 }

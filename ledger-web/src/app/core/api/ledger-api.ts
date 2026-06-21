@@ -30,4 +30,8 @@ export class LedgerApi {
   getTransaction(accountId: number, entryId: number): Observable<LedgerEntry> {
     return this.http.get<LedgerEntry>(`${this.base}/accounts/${accountId}/transactions/${entryId}`);
   }
+
+  deposit(accountId: number, amount: string): Observable<void> {
+    return this.http.post<void>(`${this.base}/accounts/${accountId}/deposit`, { amount });
+  }
 }

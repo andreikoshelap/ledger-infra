@@ -1,26 +1,58 @@
-<a class="back" routerLink="/">← Accounts</a>
+<div class="overview-page">
+  <a class="back" routerLink="/accounts">← All accounts</a>
 
-@if (store.loading()) {
-  <p class="state">Loading…</p>
-} @else if (store.error()) {
-  <p class="state state--error">{{ store.error() }}</p>
-} @else if (store.account(); as acc) {
-  <header class="acc-header">
-    <span class="acc-header__currency">{{ acc.currency }}</span>
-    <span class="acc-header__balance">{{ formatMoney(acc.balance, acc.currency) }}</span>
-    <span class="acc-header__id">#{{ acc.id }}</span>
-  </header>
+  @if (store.loading()) {
+    <section class="panel state-panel">
+      <p class="state">Loading account…</p>
+    </section>
+  } @else if (store.error()) {
+    <section class="panel state-panel">
+      <p class="state state--error">{{ store.error() }}</p>
+    </section>
+  } @else if (store.account(); as acc) {
+    <header class="hero">
+      <div>
+        <p class="hero__eyebrow">Account #{{ accountId() }}</p>
+        <h1 class="hero__balance">{{ formatMoney(acc.balance, acc.currency) }}</h1>
+      </div>
+      <div class="hero__meta">
+        <div class="metric">
+          <span class="metric__label">Currency</span>
+          <span class="metric__value">{{ acc.currency }}</span>
+        </div>
+        <div class="metric">
+          <span class="metric__label">Transactions</span>
+          <span class="metric__value">{{ store.entries().length }}</span>
+        </div>
+      </div>
+    </header>
 
-  <!-- сюда на следующем срезе встанет <app-balance-chart [series]="store.balanceSeries()" /> -->
+    @if (store.isEmpty()) {
+      <section class="panel empty-panel">
+        <h2>No transactions yet</h2>
+        <p class="state">This account is open and ready, but there is no ledger activity yet.</p>
+      </section>
+    } @else {
+      <section class="panel">
+        <div class="section-head">
+          <h2>Balance history</h2>
+          <span class="section-head__hint">Running balance over time</span>
+        </div>
+        <app-balance-chart [series]="store.balanceSeries()" [currency]="acc.currency" />
+      </section>
 
-  @if (store.isEmpty()) {
-    <p class="state">No transactions yet.</p>
-  } @else {
-    <app-transaction-list
-      [entries]="store.entries()"
-      [hasMore]="store.hasMore()"
-      [loadingMore]="store.loadingMore()"
-      [accountId]="accountId()"
-      (loadMore)="store.loadMore()" />
+      <section class="panel">
+        <div class="section-head">
+          <h2>Transactions</h2>
+          <span class="section-head__hint">Newest first</span>
+        </div>
+        <app-transaction-list
+          [entries]="store.entries()"
+          [hasMore]="store.hasMore()"
+          [loadingMore]="store.loadingMore()"
+          [accountId]="accountId()"
+          (loadMore)="store.loadMore()" />
+      </section>
+    }
   }
-}
+</div>

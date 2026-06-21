@@ -29,3 +29,4 @@ export interface TransactionPage {
   items: LedgerEntry[];
   nextCursor: number | null;
 }
+export interface BalancePoint { t: string; balance: string; }

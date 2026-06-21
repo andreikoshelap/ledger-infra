@@ -4,6 +4,10 @@ export const routes: Routes = [
   {
     path: '',
     pathMatch: 'full',
+    redirectTo: 'accounts',
+  },
+  {
+    path: 'accounts',
     title: 'Accounts',
     loadComponent: () =>
       import('./accounts/accounts-page/accounts-page').then(m => m.AccountsPage),
@@ -22,5 +26,5 @@ export const routes: Routes = [
       import('./accounts/account-overview/account-overview-page/account-overview-page')
         .then(m => m.AccountOverviewPage),
   },
-  { path: '**', redirectTo: '' },
+  { path: '**', redirectTo: 'accounts' },
 ];

@@ -4,6 +4,7 @@ import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { catchError, EMPTY, filter, forkJoin, pipe, switchMap, tap } from 'rxjs';
 import { AccountSummary, LedgerEntry } from '../../core/models/ledger';
 import { LedgerApi } from '../../core/api/ledger-api';
+import {BalancePoint} from './balance-chart/balance-chart';
 
 const PAGE = 20;
 
@@ -27,10 +28,10 @@ export const AccountOverviewStore = signalStore(
   withComputed((store) => ({
     hasMore: computed(() => store.nextCursor() !== null),
     isEmpty: computed(() => !store.loading() && store.entries().length === 0),
-    // Ряд для графика: проводки приходят newest-first, графику нужен oldest-first.
-    // Number() — только на границе отрисовки (деньги в стейте остаются строкой).
-    balanceSeries: computed(() =>
-      [...store.entries()].reverse().map((e) => ({ x: e.createdAt, y: Number(e.balanceAfter) })),
+    // newest-first → график хочет oldest-first. Деньги остаются строкой;
+    // Number() делает сам BalanceChart на отрисовке (единственная граница).
+    balanceSeries: computed<BalancePoint[]>(() =>
+      [...store.entries()].reverse().map((e) => ({ t: e.createdAt, balance: e.balanceAfter })),
     ),
   })),
   withMethods((store, api = inject(LedgerApi)) => ({

@@ -23,16 +23,20 @@ public record TransactionView(
         CurrencyCode c = t.getCurrency();
         return new TransactionView(
                 t.getId(),
-                // The domain has no separate transaction-grouping id (an exchange is
-                // two independent entries), so each entry is its own transaction.
                 t.getId(),
                 t.getAccount().getId(),
                 t.getType(),
-                c.round(t.getAmount()),
+                c.round(signedAmount(t)),     // ← знак из type, потом scale
                 c.round(t.getBalanceAfter()),
                 c,
                 t.getCounterpartyAccountId(),
                 t.getDescription(),
                 t.getCreatedAt());
     }
-}
+
+    private static BigDecimal signedAmount(AccountTransaction t) {
+        return switch (t.getType()) {
+            case DEBIT, EXCHANGE_OUT -> t.getAmount().negate();
+            case DEPOSIT, EXCHANGE_IN -> t.getAmount();
+        };
+    }}

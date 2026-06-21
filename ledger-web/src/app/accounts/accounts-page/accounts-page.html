@@ -1,35 +1,78 @@
-<header class="page-header">
-  <h1>Accounts</h1>
-  <div class="page-actions">
-    <label class="currency-picker">
-      <span>Currency</span>
-      <select [value]="selected()" (change)="selected.set($any($event.target).value)">
-        @for (currency of currencies; track currency) {
-          <option [value]="currency">{{ currency }}</option>
-        }
-      </select>
-    </label>
-    <button type="button" (click)="open()" [disabled]="store.creating() || store.loading()">Open account</button>
-    <button type="button" (click)="store.load()" [disabled]="store.loading() || store.creating()">Refresh</button>
-  </div>
-</header>
+<div class="accounts-page">
+  <header class="hero">
+    <div>
+      <p class="hero__eyebrow">Ledger workspace</p>
+      <h1 class="hero__title">Accounts</h1>
+      <p class="hero__copy">Create customer accounts, inspect balances, and move into transaction history.</p>
+    </div>
+    <div class="hero__meta">
+      <div class="metric">
+        <span class="metric__label">Accounts</span>
+        <span class="metric__value">{{ store.entities().length }}</span>
+      </div>
+      <div class="metric">
+        <span class="metric__label">Selected currency</span>
+        <span class="metric__value">{{ selected() }}</span>
+      </div>
+    </div>
+  </header>
 
-@if (store.loading()) {
-  <p class="state">Loading accounts…</p>
-} @else if (store.error()) {
-  <p class="state state--error">{{ store.error() }}</p>
-} @else if (store.isEmpty()) {
-  <p class="state">No accounts yet.</p>
-} @else {
-  <ul class="accounts">
-    @for (account of store.entities(); track account.id) {
-      <li>
-        <a class="account-card" [routerLink]="['/accounts', account.id]">
-          <span class="account-card__currency">{{ account.currency }}</span>
-          <span class="account-card__balance">{{ formatMoney(account.balance, account.currency) }}</span>
-          <span class="account-card__id">#{{ account.id }}</span>
-        </a>
-      </li>
-    }
-  </ul>
-}
+  <section class="panel controls">
+    <div class="section-head">
+      <div>
+        <h2>Open a new account</h2>
+        <p class="section-head__hint">Choose a currency and create a customer account.</p>
+      </div>
+      <button type="button" class="ghost-button" (click)="store.load()" [disabled]="store.loading() || store.creating()">Refresh</button>
+    </div>
+
+    <div class="page-actions">
+      <label class="currency-picker">
+        <span>Currency</span>
+        <select [value]="selected()" (change)="selected.set($any($event.target).value)">
+          @for (currency of currencies; track currency) {
+            <option [value]="currency">{{ currency }}</option>
+          }
+        </select>
+      </label>
+      <button type="button" class="primary-button" (click)="open()" [disabled]="store.creating() || store.loading()">Open account</button>
+    </div>
+  </section>
+
+  @if (store.loading()) {
+    <section class="panel state-panel">
+      <p class="state">Loading accounts…</p>
+    </section>
+  } @else if (store.error()) {
+    <section class="panel state-panel">
+      <p class="state state--error">{{ store.error() }}</p>
+    </section>
+  } @else if (store.isEmpty()) {
+    <section class="panel state-panel">
+      <h2>No accounts yet</h2>
+      <p class="state">Open the first account to start using the ledger.</p>
+    </section>
+  } @else {
+    <section class="panel">
+      <div class="section-head">
+        <h2>All accounts</h2>
+        <span class="section-head__hint">Select an account to view balance history and transactions.</span>
+      </div>
+
+      <ul class="accounts">
+        @for (account of store.entities(); track account.id) {
+          <li>
+            <a class="account-card" [routerLink]="['/accounts', account.id]">
+              <div class="account-card__top">
+                <span class="account-card__currency">{{ account.currency }}</span>
+                <span class="account-card__id">#{{ account.id }}</span>
+              </div>
+              <span class="account-card__balance">{{ formatMoney(account.balance, account.currency) }}</span>
+              <span class="account-card__hint">Open account overview</span>
+            </a>
+          </li>
+        }
+      </ul>
+    </section>
+  }
+</div>
