@@ -55,4 +55,8 @@ public enum CurrencyCode {
     public BigDecimal round(BigDecimal amount) {
         return amount.setScale(fractionDigits, RoundingMode.HALF_EVEN);
     }
+
+    public int displayScale() {
+        return this == VND ? 0 : 2;
+    }
 }

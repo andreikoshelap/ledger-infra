@@ -52,18 +52,27 @@ public class Account {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Enumerated
+    @Column(name = "type")
+    private AccountType type;
+
     protected Account() {
         // for JPA
     }
 
-    private Account(Long userId, CurrencyCode currency) {
+    private Account(Long userId, CurrencyCode currency, AccountType type) {
         this.userId = userId;
         this.currency = currency;
+        this.type = type;
         this.balance = BigDecimal.ZERO.setScale(STORAGE_SCALE, RoundingMode.UNNECESSARY);
     }
 
     public static Account open(Long userId, CurrencyCode currency) {
-        return new Account(userId, currency);
+        return open(userId, currency, AccountType.CUSTOMER);
+    }
+
+    public static Account open(Long userId, CurrencyCode currency, AccountType type) {
+        return new Account(userId, currency, type);
     }
 
     public void credit(BigDecimal amount) {
@@ -95,5 +104,9 @@ public class Account {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public AccountType getType() {
+        return type;
     }
 }

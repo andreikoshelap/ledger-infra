@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { AccountSummary, LedgerEntry, TransactionPage } from '../models/ledger';
+import { AccountSummary, CurrencyCode, LedgerEntry, TransactionPage } from '../models/ledger';
 
 @Injectable({ providedIn: 'root' })
 export class LedgerApi {
@@ -9,6 +9,10 @@ export class LedgerApi {
   private readonly base = '/api';
   listAccounts(): Observable<AccountSummary[]> {
     return this.http.get<AccountSummary[]>(`${this.base}/accounts`);
+  }
+
+  openAccount(currency: CurrencyCode): Observable<AccountSummary> {
+    return this.http.post<AccountSummary>(`${this.base}/accounts`, { currency });
   }
 
   getAccount(accountId: number): Observable<AccountSummary> {

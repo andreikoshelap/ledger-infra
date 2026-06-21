@@ -4,13 +4,14 @@ import com.gattopiccolo.ledger.service.AccountService;
 import com.gattopiccolo.ledger.service.view.BalanceView;
 import com.gattopiccolo.ledger.service.view.TransactionPage;
 import com.gattopiccolo.ledger.service.view.TransactionView;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import com.gattopiccolo.ledger.web.dto.AccountResponse;
+import com.gattopiccolo.ledger.web.dto.OpenAccountRequest;
+import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.URI;
 import java.util.List;
 
 /**
@@ -53,5 +54,16 @@ public class AccountController {
     @GetMapping("/{id}/transactions/{entryId}")
     public TransactionView getTransaction(@PathVariable Long id, @PathVariable Long entryId) {
         return accountService.getTransaction(id, entryId);
+    }
+
+    @PostMapping
+    ResponseEntity<AccountResponse> open(
+            @RequestHeader("X-User-Id") long userId,
+            @Valid @RequestBody OpenAccountRequest body,
+            UriComponentsBuilder uri) {
+
+        AccountResponse created = accountService.open(userId, body.currency());
+        URI location = uri.path("/api/accounts/{id}").build(created.id());
+        return ResponseEntity.created(location).body(created); // 201 + Location
     }
 }

@@ -1,6 +1,17 @@
 <header class="page-header">
   <h1>Accounts</h1>
-  <button type="button" (click)="store.load()" [disabled]="store.loading()">Refresh</button>
+  <div class="page-actions">
+    <label class="currency-picker">
+      <span>Currency</span>
+      <select [value]="selected()" (change)="selected.set($any($event.target).value)">
+        @for (currency of currencies; track currency) {
+          <option [value]="currency">{{ currency }}</option>
+        }
+      </select>
+    </label>
+    <button type="button" (click)="open()" [disabled]="store.creating() || store.loading()">Open account</button>
+    <button type="button" (click)="store.load()" [disabled]="store.loading() || store.creating()">Refresh</button>
+  </div>
 </header>
 
 @if (store.loading()) {

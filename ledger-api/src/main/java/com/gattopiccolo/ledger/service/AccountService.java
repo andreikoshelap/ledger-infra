@@ -1,6 +1,7 @@
 package com.gattopiccolo.ledger.service;
 
 import com.gattopiccolo.ledger.domain.Account;
+import com.gattopiccolo.ledger.domain.AccountType;
 import com.gattopiccolo.ledger.domain.AccountTransaction;
 import com.gattopiccolo.ledger.domain.CurrencyCode;
 import com.gattopiccolo.ledger.domain.TransactionType;
@@ -14,6 +15,7 @@ import com.gattopiccolo.ledger.service.view.BalanceView;
 import com.gattopiccolo.ledger.service.view.ExchangeResult;
 import com.gattopiccolo.ledger.service.view.TransactionPage;
 import com.gattopiccolo.ledger.service.view.TransactionView;
+import com.gattopiccolo.ledger.web.dto.AccountResponse;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -22,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 
 @Service
@@ -52,7 +55,7 @@ public class AccountService {
 
     @Transactional
     public Long openAccount(Long userId, CurrencyCode currency) {
-        return accounts.save(Account.open(userId, currency)).getId();
+        return accounts.save(Account.open(userId, currency, AccountType.CUSTOMER)).getId();
     }
 
     @Transactional(readOnly = true)
@@ -180,5 +183,10 @@ public class AccountService {
             return DEFAULT_PAGE_SIZE;
         }
         return Math.min(Math.max(limit, 1), MAX_PAGE_SIZE);
+    }
+    @Transactional
+    public AccountResponse open(long userId, CurrencyCode currency) {
+        Account saved = accounts.save(Account.open(userId, currency, AccountType.CUSTOMER));
+        return AccountResponse.from(saved);
     }
 }
