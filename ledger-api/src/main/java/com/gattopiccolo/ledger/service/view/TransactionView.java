@@ -8,30 +8,20 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 public record TransactionView(
-        Long id,
-        Long transactionId,
-        Long accountId,
+        Long id, Long transactionId, Long accountId,
         TransactionType type,
-        BigDecimal amount,
-        BigDecimal balanceAfter,
-        CurrencyCode currency,
-        Long counterpartyAccountId,
-        String description,
-        Instant createdAt) {
+        String amount, String balanceAfter,        // ← String
+        CurrencyCode currency, Long counterpartyAccountId,
+        String description, Instant createdAt) {
 
     public static TransactionView of(AccountTransaction t) {
         CurrencyCode c = t.getCurrency();
         return new TransactionView(
-                t.getId(),
-                t.getId(),
-                t.getAccount().getId(),
-                t.getType(),
-                c.round(signedAmount(t)),     // ← знак из type, потом scale
-                c.round(t.getBalanceAfter()),
-                c,
-                t.getCounterpartyAccountId(),
-                t.getDescription(),
-                t.getCreatedAt());
+                t.getId(), t.getId(), t.getAccount().getId(), t.getType(),
+                c.round(signedAmount(t)).toPlainString(),     // знак + строка
+                c.round(t.getBalanceAfter()).toPlainString(),
+                c, t.getCounterpartyAccountId(),
+                t.getDescription(), t.getCreatedAt());
     }
 
     private static BigDecimal signedAmount(AccountTransaction t) {
@@ -39,4 +29,5 @@ public record TransactionView(
             case DEBIT, EXCHANGE_OUT -> t.getAmount().negate();
             case DEPOSIT, EXCHANGE_IN -> t.getAmount();
         };
-    }}
+    }
+}

@@ -11,6 +11,13 @@
     </section>
   } @else if (store.account(); as acc) {
     <header class="hero">
+      <div class="deposit">
+        <input #amt type="text" inputmode="decimal" placeholder="0.00" />
+        <button type="button"
+                (click)="store.deposit(amt.value); amt.value = ''">
+          Deposit
+        </button>
+      </div>
       <div>
         <p class="hero__eyebrow">Account #{{ accountId() }}</p>
         <h1 class="hero__balance">{{ formatMoney(acc.balance, acc.currency) }}</h1>

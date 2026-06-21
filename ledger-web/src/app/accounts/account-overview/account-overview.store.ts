@@ -76,5 +76,32 @@ export const AccountOverviewStore = signalStore(
         ),
       ),
     ),
+    deposit: rxMethod<string>(
+      pipe(
+        filter((amount) => store.accountId() != null && amount.trim() !== ''),
+        switchMap((amount) =>
+          api.deposit(store.accountId()!, amount).pipe(
+            switchMap(() =>
+              forkJoin({
+                account: api.getAccount(store.accountId()!),
+                page: api.getHistory(store.accountId()!, null, PAGE),
+              }).pipe(
+                tap(({ account, page }) =>
+                  patchState(store, {
+                    account,
+                    entries: page.items,
+                    nextCursor: page.nextCursor,
+                  }),
+                ),
+              ),
+            ),
+            catchError(() => {
+              patchState(store, { error: 'Deposit failed' });
+              return EMPTY;
+            }),
+          ),
+        ),
+      ),
+    ),
   })),
 );
