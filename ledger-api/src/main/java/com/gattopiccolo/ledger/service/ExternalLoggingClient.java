@@ -24,15 +24,23 @@ public class ExternalLoggingClient {
     private static final Logger log = LoggerFactory.getLogger(ExternalLoggingClient.class);
 
     private final RestClient restClient;
+    private final boolean enabled;
     private final String path;
 
     public ExternalLoggingClient(RestClient externalLoggingRestClient,
+                                 @Value("${ledger.external-logging.enabled:false}") boolean enabled,
                                  @Value("${ledger.external-logging.path:/200}") String path) {
         this.restClient = externalLoggingRestClient;
+        this.enabled = enabled;
         this.path = path;
     }
 
     public void logBeforeDebit(Long accountId, BigDecimal amount) {
+        if (!enabled) {
+            log.debug("External logging disabled; skipping debit intent log for account={}, amount={}",
+                    accountId, amount);
+            return;
+        }
         try {
             restClient.get()
                     .uri(path)

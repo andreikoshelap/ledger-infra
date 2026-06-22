@@ -1,1 +1,46 @@
-<p>transaction-overview-page works!</p>
+<div class="overview-page">
+  <a class="back" [routerLink]="['/accounts', accountId()]">← Back to account</a>
+
+  @if (entry(); as e) {
+    <article class="receipt panel" #receipt>
+      <header class="receipt__head">
+        <div>
+          <p class="receipt__eyebrow">Transaction receipt</p>
+          <h1 class="receipt__amount">{{ formatMoney(e.amount, e.currency) }}</h1>
+        </div>
+        <div class="receipt__meta">
+          <span class="metric">
+            <span class="metric__label">Type</span>
+            <span class="metric__value">{{ e.type }}</span>
+          </span>
+          <span class="metric">
+            <span class="metric__label">Entry</span>
+            <span class="metric__value">#{{ e.id }}</span>
+          </span>
+        </div>
+      </header>
+
+      <dl class="receipt__body">
+        <div><dt>Amount</dt><dd>{{ formatMoney(e.amount, e.currency) }}</dd></div>
+        <div><dt>Balance after</dt><dd>{{ formatMoney(e.balanceAfter, e.currency) }}</dd></div>
+        <div><dt>Currency</dt><dd>{{ e.currency }}</dd></div>
+        <div><dt>Account</dt><dd>#{{ e.accountId }}</dd></div>
+        @if (e.counterpartyAccountId) {
+          <div><dt>Counterparty</dt><dd>#{{ e.counterpartyAccountId }}</dd></div>
+        }
+        @if (e.description) {
+          <div><dt>Description</dt><dd>{{ e.description }}</dd></div>
+        }
+        <div><dt>Date</dt><dd>{{ e.createdAt }}</dd></div>
+      </dl>
+
+      <div class="receipt__actions">
+        <button class="primary-button" type="button" (click)="downloadPdf()">Download PDF</button>
+      </div>
+    </article>
+  } @else {
+    <section class="panel state-panel">
+      <p class="state">Loading transaction…</p>
+    </section>
+  }
+</div>

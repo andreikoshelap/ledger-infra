@@ -13,10 +13,8 @@
     <header class="hero">
       <div class="deposit">
         <input #amt type="text" inputmode="decimal" placeholder="0.00" />
-        <button type="button"
-                (click)="store.deposit(amt.value); amt.value = ''">
-          Deposit
-        </button>
+        <button type="button" (click)="store.deposit(amt.value); amt.value = ''">Deposit</button>
+        <button type="button" (click)="store.debit(amt.value); amt.value = ''">Withdraw</button>
       </div>
       <div>
         <p class="hero__eyebrow">Account #{{ accountId() }}</p>

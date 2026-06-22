@@ -72,4 +72,10 @@ public class AccountController {
                                    @Valid @RequestBody AmountRequest body) {
         return accountService.deposit(id, body.amount());
     }
+
+    @PostMapping("/{id}/debit")
+    public TransactionView debit(@PathVariable Long id,
+                                 @Valid @RequestBody AmountRequest body) {
+        return accountService.debit(id, body.amount());
+    }
 }

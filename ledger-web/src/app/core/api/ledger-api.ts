@@ -34,4 +34,8 @@ export class LedgerApi {
   deposit(accountId: number, amount: string): Observable<void> {
     return this.http.post<void>(`${this.base}/accounts/${accountId}/deposit`, { amount });
   }
+
+  debit(accountId: number, amount: string): Observable<void> {
+    return this.http.post<void>(`${this.base}/accounts/${accountId}/debit`, { amount });
+  }
 }

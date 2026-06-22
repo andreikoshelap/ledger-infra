@@ -5,7 +5,7 @@
         <span class="txn__type">{{ e.type }}</span>
         <span class="txn__amount">{{ formatMoney(e.amount, e.currency) }}</span>
         <span class="txn__after">bal {{ formatMoney(e.balanceAfter, e.currency) }}</span>
-        <time class="txn__date">{{ e.createdAt | date:'short' }}</time>
+        <time class="txn__date">{{ e.createdAt | date:'dd.MM.yy HH:mm' }}</time>
       </a>
     </li>
   }

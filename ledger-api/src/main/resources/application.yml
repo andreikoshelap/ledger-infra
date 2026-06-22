@@ -25,7 +25,8 @@ spring:
 
 ledger:
   external-logging:
-    # Simulated external system that must be called before every debit.
+    # Demo integration. Disabled by default so local runs do not depend on a public endpoint.
+    enabled: false
     base-url: https://httpstat.us
     path: /200
     connect-timeout-ms: 2000

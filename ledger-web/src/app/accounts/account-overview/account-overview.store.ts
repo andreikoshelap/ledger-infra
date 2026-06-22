@@ -103,5 +103,28 @@ export const AccountOverviewStore = signalStore(
         ),
       ),
     ),
+    debit: rxMethod<string>(
+      pipe(
+        filter((amount) => store.accountId() != null && amount.trim() !== ''),
+        switchMap((amount) =>
+          api.debit(store.accountId()!, amount).pipe(
+            switchMap(() =>
+              forkJoin({
+                account: api.getAccount(store.accountId()!),
+                page: api.getHistory(store.accountId()!, null, PAGE),
+              }).pipe(
+                tap(({ account, page }) =>
+                  patchState(store, { account, entries: page.items, nextCursor: page.nextCursor }),
+                ),
+              ),
+            ),
+            catchError(() => {
+              patchState(store, { error: 'Debit failed' });
+              return EMPTY;
+            }),
+          ),
+        ),
+      ),
+    ),
   })),
 );

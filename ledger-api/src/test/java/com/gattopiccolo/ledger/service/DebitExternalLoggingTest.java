@@ -41,6 +41,7 @@ class DebitExternalLoggingTest {
 
     @DynamicPropertySource
     static void externalLoggingProperties(DynamicPropertyRegistry registry) {
+        registry.add("ledger.external-logging.enabled", () -> true);
         registry.add("ledger.external-logging.base-url", () -> "http://localhost:" + WIRE_MOCK.port());
         registry.add("ledger.external-logging.path", () -> "/200");
     }
@@ -63,7 +64,7 @@ class DebitExternalLoggingTest {
         service.deposit(id, new BigDecimal("100.00"));
         service.debit(id, new BigDecimal("40.00"));
 
-        assertEquals(new BigDecimal("60.00"), service.getBalance(id).balance());
+        assertEquals("60.00", service.getBalance(id).balance());
         WIRE_MOCK.verify(getRequestedFor(urlEqualTo("/200")));
     }
 
@@ -75,6 +76,6 @@ class DebitExternalLoggingTest {
         service.deposit(id, new BigDecimal("100.00"));
 
         assertThrows(ExternalLoggingException.class, () -> service.debit(id, new BigDecimal("40.00")));
-        assertEquals(new BigDecimal("100.00"), service.getBalance(id).balance());
+        assertEquals("100.00", service.getBalance(id).balance());
     }
 }
