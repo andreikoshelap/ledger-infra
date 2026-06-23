@@ -25,11 +25,11 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation("org.springframework.boot:spring-boot-starter-flyway")
     implementation("com.h2database:h2")
-    // Spring Boot 4 split auto-config into modules; the H2 console is no longer
-    // auto-configured by the h2 driver alone — this module registers the servlet.
     implementation("org.springframework.boot:spring-boot-h2console")
-    implementation("org.flywaydb:flyway-core")
+    runtimeOnly("org.postgresql:postgresql")
+    runtimeOnly("org.flywaydb:flyway-database-postgresql")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.wiremock:wiremock-standalone:3.9.2")
@@ -39,3 +39,5 @@ dependencies {
 tasks.withType<Test> {
     useJUnitPlatform()
 }
+
+tasks.named<Jar>("jar") { enabled = false }

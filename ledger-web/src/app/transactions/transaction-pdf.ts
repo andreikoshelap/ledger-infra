@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { LedgerEntry } from '../core/models/ledger';
 import { formatMoney } from '../core/money/format';
-// import { formatDateTime } from '../core/money/format'; // или где у тебя хелпер даты
+// import { formatDateTime } from '../core/money/format'; // or wherever your date helper lives
 
 export function downloadTransactionPdf(e: LedgerEntry): void {
   const doc = new jsPDF({ unit: 'pt', format: 'a4' });
@@ -22,7 +22,7 @@ export function downloadTransactionPdf(e: LedgerEntry): void {
 
   row('Transaction', `#${e.id}`);
   row('Type', e.type);
-  row('Amount', formatMoney(e.amount, e.currency));         // строка → формат, без арифметики
+  row('Amount', formatMoney(e.amount, e.currency));         // string to formatting, with no arithmetic
   row('Balance after', formatMoney(e.balanceAfter, e.currency));
   row('Currency', e.currency);
   row('Account', `#${e.accountId}`);

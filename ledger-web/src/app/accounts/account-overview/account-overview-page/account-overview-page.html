@@ -15,6 +15,9 @@
         <input class="account-field" #amt type="text" inputmode="decimal" placeholder="0.00" />
         <button class="account-action-button" type="button" (click)="store.deposit(amt.value); amt.value = ''">Deposit</button>
         <button class="account-action-button" type="button" (click)="store.debit(amt.value); amt.value = ''">Withdraw</button>
+        @if (store.opErrorTarget() === 'debit' && store.opError(); as err) {
+          <p class="form-error" role="alert">{{ err }}</p>
+        }
       </div>
       <div class="exchange">
         <select class="account-field" [value]="selectedTo() ?? ''"
@@ -24,12 +27,21 @@
             <option [value]="a.id">#{{ a.id }} · {{ a.currency }}</option>
           }
         </select>
-        <input class="account-field" #xamt type="text" inputmode="decimal" placeholder="0.00" />
+        <input class="account-field" #xamt type="text" inputmode="decimal" placeholder="0.00"
+               [value]="amount()" (input)="onExchangeAmountInput($any($event.target).value)" />
         <button class="account-action-button" type="button"
                 [disabled]="!hasExchangeTarget()"
                 (click)="doExchange(xamt.value); xamt.value = ''">
           Exchange
         </button>
+        @if (quote(); as q) {
+          <p class="exchange__preview">
+            {{ formatMoney(q.amount, q.from) }} → {{ formatMoney(q.converted, q.to) }}
+          </p>
+        }
+        @if (store.opErrorTarget() === 'exchange' && store.opError(); as err) {
+          <p class="form-error" role="alert">{{ err }}</p>
+        }
       </div>
       <div>
         <p class="account-header__eyebrow">Account #{{ accountId() }}</p>

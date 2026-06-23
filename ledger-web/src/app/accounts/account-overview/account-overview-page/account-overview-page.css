@@ -61,6 +61,11 @@
   gap: 0.5rem;
 }
 
+.deposit,
+.exchange {
+  align-content: flex-start;
+}
+
 .account-field,
 .account-action-button {
   min-height: 36px;
@@ -148,6 +153,13 @@
 
 .state--error {
   color: #b42318;
+}
+
+.form-error {
+  flex: 1 1 100%;
+  margin: 0.125rem 0 0;
+  color: #b42318;
+  font-size: 0.9rem;
 }
 
 .state-panel,

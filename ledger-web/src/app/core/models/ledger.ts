@@ -29,4 +29,7 @@ export interface TransactionPage {
   items: LedgerEntry[];
   nextCursor: number | null;
 }
+
+export interface Quote { amount: string; converted: string; from: CurrencyCode; to: CurrencyCode; }
+
 export interface BalancePoint { t: string; balance: string; }

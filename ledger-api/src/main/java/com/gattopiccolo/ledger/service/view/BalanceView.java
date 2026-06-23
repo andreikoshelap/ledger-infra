@@ -9,6 +9,6 @@ public record BalanceView(Long id, CurrencyCode currency, String balance) {
         CurrencyCode c = account.getCurrency();
         return new BalanceView(
                 account.getId(), c,
-                c.round(account.getBalance()).toPlainString());  // ← строка
+                c.round(account.getBalance()).toPlainString());  // rendered string
     }
 }

@@ -1,5 +1,3 @@
-# Production-shaped local stack: one public entry (web), api+db internal.
-# Dev flow does NOT need this — there you run `ng serve` + `./gradlew bootRun`.
 services:
   db:
     image: postgres:17-alpine
@@ -14,35 +12,24 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
-    # ports: ["5432:5432"]   # uncomment only to inspect the DB from the host
 
   api:
-    build:
-      context: ./ledger-api
+    build: ./ledger-api
     environment:
+      SPRING_PROFILES_ACTIVE: docker,${SPRING_PROFILES_ACTIVE:-demo}
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
     depends_on:
       db:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
-      interval: 10s
-      timeout: 3s
-      retries: 12
-      start_period: 40s
-    # Not published to the host. Reachable as http://api:8080 on the compose network.
-    # ports: ["8080:8080"]   # uncomment to point `ng serve` proxy at the composed api
 
   web:
-    build:
-      context: ./ledger-web
+    build: ./ledger-web
+    ports:
+      - "8081:80"
     depends_on:
       - api
-    ports:
-      - "8080:80"            # the ONLY public entry point: host:8080 -> nginx:80
 
 volumes:
   pgdata:

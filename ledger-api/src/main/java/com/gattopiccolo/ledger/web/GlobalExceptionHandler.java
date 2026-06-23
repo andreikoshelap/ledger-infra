@@ -1,9 +1,11 @@
 package com.gattopiccolo.ledger.web;
 
 import com.gattopiccolo.ledger.exception.AccountNotFoundException;
+import com.gattopiccolo.ledger.exception.InsufficientFundsException;
 import com.gattopiccolo.ledger.exception.InvalidAmountException;
 import com.gattopiccolo.ledger.exception.TransactionNotFoundException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -28,5 +30,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidAmountException.class)
     public Map<String, String> handleBadRequest(RuntimeException ex) {
         return Map.of("error", "Bad Request", "message", ex.getMessage());
+    }
+
+    @ExceptionHandler(InsufficientFundsException.class)
+    ProblemDetail handleInsufficientFunds() {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(
+                HttpStatus.UNPROCESSABLE_CONTENT,         // 422
+                "Insufficient funds for this operation.");
+        pd.setTitle("Insufficient funds");
+        return pd;
     }
 }

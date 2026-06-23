@@ -16,6 +16,10 @@ export class AccountsPage {
   protected readonly currencies: CurrencyCode[] = ['EUR', 'USD', 'SEK', 'GBP', 'VND'];
   protected readonly selected = signal<CurrencyCode>('EUR');
 
+  constructor() {
+    this.store.load();
+  }
+
   protected open(): void {
     this.store.openAccount(this.selected());
   }

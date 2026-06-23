@@ -10,7 +10,7 @@ import java.time.Instant;
 public record TransactionView(
         Long id, Long transactionId, Long accountId,
         TransactionType type,
-        String amount, String balanceAfter,        // ← String
+        String amount, String balanceAfter,        // rendered strings
         CurrencyCode currency, Long counterpartyAccountId,
         String description, Instant createdAt) {
 
@@ -18,7 +18,7 @@ public record TransactionView(
         CurrencyCode c = t.getCurrency();
         return new TransactionView(
                 t.getId(), t.getId(), t.getAccount().getId(), t.getType(),
-                c.round(signedAmount(t)).toPlainString(),     // знак + строка
+                c.round(signedAmount(t)).toPlainString(),     // signed rendered string
                 c.round(t.getBalanceAfter()).toPlainString(),
                 c, t.getCounterpartyAccountId(),
                 t.getDescription(), t.getCreatedAt());

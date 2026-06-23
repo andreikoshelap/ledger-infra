@@ -20,7 +20,7 @@ export class TransactionOverviewPage {
   private readonly api = inject(LedgerApi);
   protected readonly formatMoney = formatMoney;
 
-  // оба id — сигналы из роута; реагируем на смену, дёргаем getTransaction
+    // both ids are route signals; react to changes and call getTransaction
   protected readonly entry = toSignal(
     toObservable(this.entryId).pipe(
       switchMap((entryId) => this.api.getTransaction(this.accountId(), entryId)),
@@ -29,6 +29,6 @@ export class TransactionOverviewPage {
 
   protected downloadPdf(): void {
     const e = this.entry();
-    if (e) downloadTransactionPdf(e);   // guard: entry() может быть undefined до загрузки
+    if (e) downloadTransactionPdf(e);   // guard: entry() may be undefined before loading completes
   }
 }

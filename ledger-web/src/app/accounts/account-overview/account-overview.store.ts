@@ -5,6 +5,7 @@ import { catchError, EMPTY, filter, forkJoin, pipe, switchMap, tap } from 'rxjs'
 import { AccountSummary, LedgerEntry } from '../../core/models/ledger';
 import { LedgerApi } from '../../core/api/ledger-api';
 import {BalancePoint} from './balance-chart/balance-chart';
+import { HttpErrorResponse } from '@angular/common/http';
 
 const PAGE = 20;
 
@@ -13,14 +14,16 @@ type State = {
   account: AccountSummary | null;
   entries: LedgerEntry[];
   nextCursor: number | null;
-  loading: boolean;       // первичная загрузка (аккаунт + первая страница)
-  loadingMore: boolean;   // дозагрузка следующей страницы
+  loading: boolean;       // initial load (account + first page)
+  loadingMore: boolean;   // loading the next page
   error: string | null;
+  opError: string | null;
+  opErrorTarget: 'debit' | 'exchange' | null;
 };
 
 const initial: State = {
   accountId: null, account: null, entries: [],
-  nextCursor: null, loading: false, loadingMore: false, error: null,
+  nextCursor: null, loading: false, loadingMore: false, error: null, opError: null, opErrorTarget: null,
 };
 
 export const AccountOverviewStore = signalStore(
@@ -28,14 +31,14 @@ export const AccountOverviewStore = signalStore(
   withComputed((store) => ({
     hasMore: computed(() => store.nextCursor() !== null),
     isEmpty: computed(() => !store.loading() && store.entries().length === 0),
-    // newest-first → график хочет oldest-first. Деньги остаются строкой;
-    // Number() делает сам BalanceChart на отрисовке (единственная граница).
+    // The list is newest-first, while the chart wants oldest-first. Money stays as strings;
+    // BalanceChart performs Number() conversion during rendering as the only boundary.
     balanceSeries: computed<BalancePoint[]>(() =>
       [...store.entries()].reverse().map((e) => ({ t: e.createdAt, balance: e.balanceAfter })),
     ),
   })),
   withMethods((store, api = inject(LedgerApi)) => ({
-    // Принимает СИГНАЛ accountId из инпута страницы => сам реагирует на смену роута.
+    // Accepts the accountId signal from the page input and reacts to route changes on its own.
     loadAccount: rxMethod<number>(
       pipe(
         tap((id) => patchState(store, {
@@ -106,6 +109,7 @@ export const AccountOverviewStore = signalStore(
     debit: rxMethod<string>(
       pipe(
         filter((amount) => store.accountId() != null && amount.trim() !== ''),
+        tap(() => patchState(store, { opError: null, opErrorTarget: null })),
         switchMap((amount) =>
           api.debit(store.accountId()!, amount).pipe(
             switchMap(() =>
@@ -118,8 +122,11 @@ export const AccountOverviewStore = signalStore(
                 ),
               ),
             ),
-            catchError(() => {
-              patchState(store, { error: 'Debit failed' });
+            catchError((e: HttpErrorResponse) => {
+              patchState(store, {
+                opError: e.error?.detail ?? 'Debit failed',
+                opErrorTarget: 'debit',
+              });
               return EMPTY;
             }),
           ),
@@ -130,6 +137,7 @@ export const AccountOverviewStore = signalStore(
       pipe(
         filter(({ toAccountId, amount }) =>
           store.accountId() != null && toAccountId != null && amount.trim() !== ''),
+        tap(() => patchState(store, { opError: null, opErrorTarget: null })),
         switchMap(({ toAccountId, amount }) =>
           api.exchange(store.accountId()!, toAccountId, amount).pipe(
             switchMap(() =>
@@ -142,7 +150,13 @@ export const AccountOverviewStore = signalStore(
                 ),
               ),
             ),
-            catchError(() => { patchState(store, { error: 'Exchange failed' }); return EMPTY; }),
+            catchError((e: HttpErrorResponse) => {
+              patchState(store, {
+                opError: e.error?.detail ?? 'Exchange failed',
+                opErrorTarget: 'exchange',
+              });
+              return EMPTY;
+            }),
           ),
         ),
       ),

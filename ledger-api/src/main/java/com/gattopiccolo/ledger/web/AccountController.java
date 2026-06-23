@@ -8,11 +8,13 @@ import com.gattopiccolo.ledger.service.view.TransactionView;
 import com.gattopiccolo.ledger.web.dto.AmountRequest;
 import com.gattopiccolo.ledger.web.dto.ExchangeRequest;
 import com.gattopiccolo.ledger.web.dto.OpenAccountRequest;
+import com.gattopiccolo.ledger.web.dto.QuoteResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.math.BigDecimal;
 import java.net.URI;
 import java.util.List;
 
@@ -85,5 +87,12 @@ public class AccountController {
     public ExchangeResult exchange(@RequestHeader("X-User-Id") Long userId,
                                    @Valid @RequestBody ExchangeRequest body) {
         return accountService.exchange(userId, body.fromAccountId(), body.toAccountId(), body.amount());
+    }
+
+    @GetMapping("/quote")
+    public QuoteResponse quote(@RequestParam Long from,
+                               @RequestParam Long to,
+                               @RequestParam BigDecimal amount) {
+        return accountService.quote(from, to, amount);
     }
 }

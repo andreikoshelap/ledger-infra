@@ -10,7 +10,7 @@ export class IntersectDirective implements OnDestroy {
     afterNextRender(() => {
       this.observer = new IntersectionObserver(
         (entries) => entries.some((e) => e.isIntersecting) && this.intersect.emit(),
-        { rootMargin: '200px' }, // префетч заранее, до самого низа
+      { rootMargin: '200px' }, // prefetch before reaching the very bottom
       );
       this.observer.observe(this.host.nativeElement);
     });

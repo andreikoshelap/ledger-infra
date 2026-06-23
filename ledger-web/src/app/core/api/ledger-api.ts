@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { AccountSummary, CurrencyCode, LedgerEntry, TransactionPage } from '../models/ledger';
+import {AccountSummary, CurrencyCode, LedgerEntry, Quote, TransactionPage} from '../models/ledger';
 
 @Injectable({ providedIn: 'root' })
 export class LedgerApi {
@@ -42,5 +42,10 @@ export class LedgerApi {
   exchange(fromAccountId: number, toAccountId: number, amount: string): Observable<void> {
     return this.http.post<void>(`${this.base}/accounts/exchange`,
       { fromAccountId, toAccountId, amount });
+  }
+
+  quote(from: number, to: number, amount: string): Observable<Quote> {
+    const params = new HttpParams().set('from', from).set('to', to).set('amount', amount);
+    return this.http.get<Quote>(`${this.base}/accounts/quote`, { params });
   }
 }

@@ -27,13 +27,13 @@ Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryS
 
 export interface BalancePoint {
   t: string;       // createdAt, ISO
-  balance: string; // знаковая money-строка: "1234.00"
+  balance: string; // signed money string: "1234.00"
 }
 
 @Component({
   selector: 'app-balance-chart',
   template: `<canvas #canvas></canvas>`,
-  // фикс. высота обязательна: Chart.js responsive + maintainAspectRatio:false тянется по контейнеру
+// A fixed height is required: responsive Chart.js with maintainAspectRatio:false stretches to the container
   styles: `:host { display: block; position: relative; height: 220px; }`,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -44,22 +44,24 @@ export class BalanceChart {
   private readonly canvas = viewChild.required<ElementRef<HTMLCanvasElement>>('canvas');
   private chart?: Chart<'line'>;
 
-  // Intl сам знает scale валюты (VND → 0 знаков) — никакого ручного спец-кейса VND.
+    // Intl already knows the currency scale (VND -> 0 digits), so no manual VND special case is needed.
   private readonly money = computed(
     () => new Intl.NumberFormat(undefined, { style: 'currency', currency: this.currency() }),
   );
-  private readonly dateFmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
+  private readonly dateFmt = new Intl.DateTimeFormat(undefined, {
+    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  });
 
   constructor() {
     const destroyRef = inject(DestroyRef);
 
-    // canvas существует только после первого рендера → создаём график здесь, не в effect.
+    // The canvas exists only after the first render, so create the chart here instead of inside an effect.
     afterNextRender(() => {
       this.chart = new Chart(this.canvas().nativeElement, this.config());
       this.sync();
     });
 
-    // данные перекладываем при любом изменении сигналов; работает вне Angular CD — для zoneless ок.
+      // Rebuild data on any signal change; this runs outside Angular CD, which is fine for zoneless mode.
     effect(() => {
       this.series();      // tracked
       this.currency();    // tracked
@@ -71,13 +73,13 @@ export class BalanceChart {
 
   private sync(): void {
     const chart = this.chart;
-    if (!chart) return; // effect может сработать раньше afterNextRender — это нормально
+    if (!chart) return; // the effect may run before afterNextRender, which is fine
 
     const pts = this.series();
     chart.data.labels = pts.map((p) => this.dateFmt.format(new Date(p.t)));
-    // ЕДИНСТВЕННАЯ граница string→number во всём money-флоу. Никакой арифметики, только отрисовка.
+    // This is the only string-to-number boundary in the money flow. No arithmetic, rendering only.
     chart.data.datasets[0].data = pts.map((p) => Number(p.balance));
-    chart.update('none'); // без переанимации всего графика на каждый догруженный кусок
+    chart.update('none'); // avoid re-animating the whole chart for every newly loaded slice
   }
 
   private config(): ChartConfiguration<'line'> {

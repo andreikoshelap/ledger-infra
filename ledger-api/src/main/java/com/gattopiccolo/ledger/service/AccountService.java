@@ -11,6 +11,7 @@ import com.gattopiccolo.ledger.service.view.BalanceView;
 import com.gattopiccolo.ledger.service.view.ExchangeResult;
 import com.gattopiccolo.ledger.service.view.TransactionPage;
 import com.gattopiccolo.ledger.service.view.TransactionView;
+import com.gattopiccolo.ledger.web.dto.QuoteResponse;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -154,6 +155,19 @@ public class AccountService {
 
             return new ExchangeResult(TransactionView.of(out), TransactionView.of(in));
         });
+    }
+
+    @Transactional(readOnly = true)
+    public QuoteResponse quote(Long fromAccountId, Long toAccountId, BigDecimal rawAmount) {
+        requirePositive(rawAmount);
+        Account from = load(fromAccountId);
+        Account to = load(toAccountId);
+        BigDecimal amount = from.getCurrency().requireValidScale(rawAmount);
+        BigDecimal converted = rates.convert(amount, from.getCurrency(), to.getCurrency());
+        return new QuoteResponse(
+                from.getCurrency().round(amount).toPlainString(),
+                to.getCurrency().round(converted).toPlainString(),
+                from.getCurrency(), to.getCurrency());
     }
 
     // ----- helpers ---------------------------------------------------------

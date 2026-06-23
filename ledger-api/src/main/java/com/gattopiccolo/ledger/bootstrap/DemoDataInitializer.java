@@ -33,9 +33,11 @@ public class DemoDataInitializer implements CommandLineRunner {
     public void run(String... args) {
         Long eur = service.openAccount(DEMO_USER, CurrencyCode.EUR);
         Long usd = service.openAccount(DEMO_USER, CurrencyCode.USD);
+        Long vnd = service.openAccount(DEMO_USER, CurrencyCode.VND);
 
         service.deposit(eur, new BigDecimal("1000.00"));
         service.deposit(usd, new BigDecimal("500.00"));
+        service.deposit(vnd, new BigDecimal("100.00"));
         service.debit(eur, new BigDecimal("120.50"));
         service.exchange(DEMO_USER, eur, usd, new BigDecimal("100.00"));
 
