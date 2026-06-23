@@ -124,7 +124,7 @@ public class AccountService {
      * avoid deadlocks between two concurrent, mirror-image exchanges. The external
      * logging call runs first, outside the transaction (the source is debited).
      */
-    public ExchangeResult exchange(Long fromAccountId, Long toAccountId, BigDecimal rawAmount) {
+    public ExchangeResult exchange(Long userId, Long fromAccountId, Long toAccountId, BigDecimal rawAmount) {
         if (fromAccountId.equals(toAccountId)) {
             throw new InvalidAmountException("Source and target accounts must differ");
         }
@@ -134,8 +134,8 @@ public class AccountService {
         return tx.execute(status -> {
             long firstId = Math.min(fromAccountId, toAccountId);
             long secondId = Math.max(fromAccountId, toAccountId);
-            Account first = lock(firstId);
-            Account second = lock(secondId);
+            Account first = lock(firstId, userId);
+            Account second = lock(secondId, userId);
             Account from = fromAccountId == firstId ? first : second;
             Account to = fromAccountId == firstId ? second : first;
 
@@ -160,6 +160,11 @@ public class AccountService {
 
     private Account lock(Long id) {
         return accounts.findByIdForUpdate(id).orElseThrow(() -> new AccountNotFoundException(id));
+    }
+
+    private Account lock(Long id, Long userId) {
+        return accounts.findByIdForUpdateAndUserId(id, userId)
+                .orElseThrow(() -> new AccountNotFoundException(id));
     }
 
     private Account load(Long id) {

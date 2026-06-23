@@ -126,5 +126,26 @@ export const AccountOverviewStore = signalStore(
         ),
       ),
     ),
+    exchange: rxMethod<{ toAccountId: number; amount: string }>(
+      pipe(
+        filter(({ toAccountId, amount }) =>
+          store.accountId() != null && toAccountId != null && amount.trim() !== ''),
+        switchMap(({ toAccountId, amount }) =>
+          api.exchange(store.accountId()!, toAccountId, amount).pipe(
+            switchMap(() =>
+              forkJoin({
+                account: api.getAccount(store.accountId()!),
+                page: api.getHistory(store.accountId()!, null, PAGE),
+              }).pipe(
+                tap(({ account, page }) =>
+                  patchState(store, { account, entries: page.items, nextCursor: page.nextCursor }),
+                ),
+              ),
+            ),
+            catchError(() => { patchState(store, { error: 'Exchange failed' }); return EMPTY; }),
+          ),
+        ),
+      ),
+    ),
   })),
 );

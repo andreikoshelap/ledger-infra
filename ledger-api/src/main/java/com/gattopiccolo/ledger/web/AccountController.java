@@ -2,9 +2,11 @@ package com.gattopiccolo.ledger.web;
 
 import com.gattopiccolo.ledger.service.AccountService;
 import com.gattopiccolo.ledger.service.view.BalanceView;
+import com.gattopiccolo.ledger.service.view.ExchangeResult;
 import com.gattopiccolo.ledger.service.view.TransactionPage;
 import com.gattopiccolo.ledger.service.view.TransactionView;
 import com.gattopiccolo.ledger.web.dto.AmountRequest;
+import com.gattopiccolo.ledger.web.dto.ExchangeRequest;
 import com.gattopiccolo.ledger.web.dto.OpenAccountRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -77,5 +79,11 @@ public class AccountController {
     public TransactionView debit(@PathVariable Long id,
                                  @Valid @RequestBody AmountRequest body) {
         return accountService.debit(id, body.amount());
+    }
+
+    @PostMapping("/exchange")
+    public ExchangeResult exchange(@RequestHeader("X-User-Id") Long userId,
+                                   @Valid @RequestBody ExchangeRequest body) {
+        return accountService.exchange(userId, body.fromAccountId(), body.toAccountId(), body.amount());
     }
 }

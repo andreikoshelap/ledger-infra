@@ -39,34 +39,37 @@ class ConcurrentDebitTest {
         service.deposit(id, new BigDecimal("100.00"));
 
         int threads = 15;
-        ExecutorService pool = Executors.newFixedThreadPool(threads);
-        CountDownLatch start = new CountDownLatch(1);
-        AtomicInteger succeeded = new AtomicInteger();
-        AtomicInteger insufficient = new AtomicInteger();
-        List<Future<?>> futures = new ArrayList<>();
+        AtomicInteger succeeded;
+        AtomicInteger insufficient;
+        try (ExecutorService pool = Executors.newFixedThreadPool(threads)) {
+            CountDownLatch start = new CountDownLatch(1);
+            succeeded = new AtomicInteger();
+            insufficient = new AtomicInteger();
+            List<Future<?>> futures = new ArrayList<>();
 
-        for (int i = 0; i < threads; i++) {
-            futures.add(pool.submit(() -> {
-                try {
-                    start.await();
-                    service.debit(id, new BigDecimal("10.00"));
-                    succeeded.incrementAndGet();
-                } catch (InsufficientFundsException e) {
-                    insufficient.incrementAndGet();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-            }));
-        }
+            for (int i = 0; i < threads; i++) {
+                futures.add(pool.submit(() -> {
+                    try {
+                        start.await();
+                        service.debit(id, new BigDecimal("10.00"));
+                        succeeded.incrementAndGet();
+                    } catch (InsufficientFundsException e) {
+                        insufficient.incrementAndGet();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                }));
+            }
 
-        start.countDown();
-        for (Future<?> f : futures) {
-            f.get();
+            start.countDown();
+            for (Future<?> f : futures) {
+                f.get();
+            }
+            pool.shutdown();
         }
-        pool.shutdown();
 
         assertEquals(10, succeeded.get());
         assertEquals(5, insufficient.get());
-        assertEquals(new BigDecimal("0.00"), service.getBalance(id).balance());
+        assertEquals("0.00", service.getBalance(id).balance());
     }
 }

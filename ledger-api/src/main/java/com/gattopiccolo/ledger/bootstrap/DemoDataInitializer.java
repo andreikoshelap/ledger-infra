@@ -37,7 +37,7 @@ public class DemoDataInitializer implements CommandLineRunner {
         service.deposit(eur, new BigDecimal("1000.00"));
         service.deposit(usd, new BigDecimal("500.00"));
         service.debit(eur, new BigDecimal("120.50"));
-        service.exchange(eur, usd, new BigDecimal("100.00"));
+        service.exchange(DEMO_USER, eur, usd, new BigDecimal("100.00"));
 
         log.info("Demo data ready: user={}, EUR account={}, USD account={}", DEMO_USER, eur, usd);
     }

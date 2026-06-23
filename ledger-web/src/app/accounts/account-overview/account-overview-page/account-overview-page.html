@@ -10,17 +10,32 @@
       <p class="state state--error">{{ store.error() }}</p>
     </section>
   } @else if (store.account(); as acc) {
-    <header class="hero">
+    <header class="account-header">
       <div class="deposit">
-        <input #amt type="text" inputmode="decimal" placeholder="0.00" />
-        <button type="button" (click)="store.deposit(amt.value); amt.value = ''">Deposit</button>
-        <button type="button" (click)="store.debit(amt.value); amt.value = ''">Withdraw</button>
+        <input class="account-field" #amt type="text" inputmode="decimal" placeholder="0.00" />
+        <button class="account-action-button" type="button" (click)="store.deposit(amt.value); amt.value = ''">Deposit</button>
+        <button class="account-action-button" type="button" (click)="store.debit(amt.value); amt.value = ''">Withdraw</button>
+      </div>
+      <div class="exchange">
+        <select class="account-field" [value]="selectedTo() ?? ''"
+                (change)="onExchangeTargetChange($any($event.target).value)">
+          <option value="" disabled>To account…</option>
+          @for (a of others(); track a.id) {
+            <option [value]="a.id">#{{ a.id }} · {{ a.currency }}</option>
+          }
+        </select>
+        <input class="account-field" #xamt type="text" inputmode="decimal" placeholder="0.00" />
+        <button class="account-action-button" type="button"
+                [disabled]="!hasExchangeTarget()"
+                (click)="doExchange(xamt.value); xamt.value = ''">
+          Exchange
+        </button>
       </div>
       <div>
-        <p class="hero__eyebrow">Account #{{ accountId() }}</p>
-        <h1 class="hero__balance">{{ formatMoney(acc.balance, acc.currency) }}</h1>
+        <p class="account-header__eyebrow">Account #{{ accountId() }}</p>
+        <h1 class="account-header__balance">{{ formatMoney(acc.balance, acc.currency) }}</h1>
       </div>
-      <div class="hero__meta">
+      <div class="account-header__meta">
         <div class="metric">
           <span class="metric__label">Currency</span>
           <span class="metric__value">{{ acc.currency }}</span>
