@@ -13,6 +13,20 @@ The system supports:
 - exchange between two accounts
 - transaction history with cursor pagination
 
+## UI Screenshots
+
+### Accounts
+
+![Accounts page](docs/images/accounts-page.png)
+
+### Account
+
+![Account page](docs/images/account-page.png)
+
+### Transaction
+
+![Transaction page](docs/images/transaction-page.png)
+
 ## Architecture
 
 This implementation uses a stored-balance, single-entry ledger model with a
