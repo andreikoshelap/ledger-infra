@@ -1,7 +1,7 @@
 import {Component, inject, signal} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AccountsStore } from '../accounts.store';
-import { formatMoney } from '../../core/money/format';
+import { formatMoney } from '../../core/format';
 import {CurrencyCode} from '../../core/models/ledger';
 
 @Component({

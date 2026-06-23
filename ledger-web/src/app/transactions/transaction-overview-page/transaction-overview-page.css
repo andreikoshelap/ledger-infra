@@ -78,9 +78,10 @@
 }
 
 .metric__value {
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: #14213d;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #215cff;
 }
 
 .receipt__body {
@@ -109,9 +110,10 @@
 
 .receipt__body dd {
   margin: 0;
-  color: #14213d;
-  font-size: 1rem;
-  font-weight: 600;
+  color: #215cff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
   line-height: 1.4;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;

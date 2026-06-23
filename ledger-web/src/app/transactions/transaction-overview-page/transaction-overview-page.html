@@ -31,7 +31,7 @@
         @if (e.description) {
           <div><dt>Description</dt><dd>{{ e.description }}</dd></div>
         }
-        <div><dt>Date</dt><dd>{{ e.createdAt }}</dd></div>
+        <div><dt>Date</dt><dd>{{ formatDateTime(e.createdAt) }}</dd></div>
       </dl>
 
       <div class="receipt__actions">

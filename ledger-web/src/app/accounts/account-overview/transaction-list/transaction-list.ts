@@ -2,7 +2,7 @@ import { Component, input, output } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { LedgerEntry } from '../../../core/models/ledger';
-import { formatMoney } from '../../../core/money/format';
+import { formatMoney } from '../../../core/format';
 import { IntersectDirective } from '../../../core/intersect';
 
 @Component({

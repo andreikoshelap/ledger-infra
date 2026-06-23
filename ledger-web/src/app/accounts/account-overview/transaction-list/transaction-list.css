@@ -3,7 +3,12 @@
   padding: 0.6rem 0.5rem; border-bottom: 1px solid #eee; text-decoration: none; color: inherit; }
 .txn:hover { background: #fafafa; }
 .txn__type { font-size: 0.75rem; letter-spacing: 0.04em; color: #777; }
-.txn__amount { font-weight: 600; font-variant-numeric: tabular-nums; }
-.txn__after { color: #999; font-variant-numeric: tabular-nums; }
+.txn__amount,
+.txn__after {
+  color: #215cff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
 .txn__date { color: #999; font-size: 0.8rem; }
 .sentinel { height: 2.5rem; display: grid; place-items: center; color: #999; }

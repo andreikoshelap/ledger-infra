@@ -2,7 +2,7 @@ import {Component, computed, effect, inject, input, numberAttribute, signal} fro
 import { RouterLink } from '@angular/router';
 import { AccountOverviewStore } from '../account-overview.store';
 import { TransactionList } from '../transaction-list/transaction-list';
-import { formatMoney } from '../../../core/money/format';
+import { formatMoney } from '../../../core/format';
 import { BalanceChart } from '../balance-chart/balance-chart';
 import { AccountsStore } from '../../accounts.store';
 import {LedgerApi} from '../../../core/api/ledger-api';

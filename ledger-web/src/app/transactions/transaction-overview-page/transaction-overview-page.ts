@@ -4,7 +4,7 @@ import { RouterLink } from '@angular/router';
 import { switchMap } from 'rxjs';
 import { toObservable } from '@angular/core/rxjs-interop';
 import { LedgerApi } from '../../core/api/ledger-api';
-import { formatMoney } from '../../core/money/format';
+import { formatDateTime, formatMoney } from '../../core/format';
 import { downloadTransactionPdf } from '../transaction-pdf';
 
 @Component({
@@ -19,6 +19,7 @@ export class TransactionOverviewPage {
 
   private readonly api = inject(LedgerApi);
   protected readonly formatMoney = formatMoney;
+  protected readonly formatDateTime = formatDateTime;
 
     // both ids are route signals; react to changes and call getTransaction
   protected readonly entry = toSignal(

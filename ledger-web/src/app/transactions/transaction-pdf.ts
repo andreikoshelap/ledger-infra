@@ -1,7 +1,6 @@
 import { jsPDF } from 'jspdf';
 import { LedgerEntry } from '../core/models/ledger';
-import { formatMoney } from '../core/money/format';
-// import { formatDateTime } from '../core/money/format'; // or wherever your date helper lives
+import { formatDateTime } from '../core/format';
 
 export function downloadTransactionPdf(e: LedgerEntry): void {
   const doc = new jsPDF({ unit: 'pt', format: 'a4' });
@@ -22,13 +21,17 @@ export function downloadTransactionPdf(e: LedgerEntry): void {
 
   row('Transaction', `#${e.id}`);
   row('Type', e.type);
-  row('Amount', formatMoney(e.amount, e.currency));         // string to formatting, with no arithmetic
-  row('Balance after', formatMoney(e.balanceAfter, e.currency));
+  row('Amount', formatPdfMoney(e.amount, e.currency));
+  row('Balance after', formatPdfMoney(e.balanceAfter, e.currency));
   row('Currency', e.currency);
   row('Account', `#${e.accountId}`);
   if (e.counterpartyAccountId) row('Counterparty', `#${e.counterpartyAccountId}`);
   if (e.description) row('Description', e.description);
-  // row('Date', formatDateTime(e.createdAt));
+  row('Date', formatDateTime(e.createdAt));
 
   doc.save(`transaction-${e.id}.pdf`);
+}
+
+function formatPdfMoney(amount: string, currency: string): string {
+  return `${amount} ${currency}`;
 }
