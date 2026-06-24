@@ -2,6 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import {AccountSummary, CurrencyCode, LedgerEntry, Quote, TransactionPage} from '../models/ledger';
+import {normalizeAmount} from '../format';
 
 @Injectable({ providedIn: 'root' })
 export class LedgerApi {
@@ -32,16 +33,17 @@ export class LedgerApi {
   }
 
   deposit(accountId: number, amount: string): Observable<void> {
-    return this.http.post<void>(`${this.base}/accounts/${accountId}/deposit`, { amount });
+    return this.http.post<void>(`${this.base}/accounts/${accountId}/deposit`,
+      { amount: normalizeAmount(amount) });
   }
 
   debit(accountId: number, amount: string): Observable<void> {
-    return this.http.post<void>(`${this.base}/accounts/${accountId}/debit`, { amount });
+    return this.http.post<void>(`${this.base}/accounts/${accountId}/debit`, { amount: normalizeAmount(amount) });
   }
 
   exchange(fromAccountId: number, toAccountId: number, amount: string): Observable<void> {
     return this.http.post<void>(`${this.base}/accounts/exchange`,
-      { fromAccountId, toAccountId, amount });
+      { fromAccountId, toAccountId,  amount:  normalizeAmount(amount) });
   }
 
   quote(from: number, to: number, amount: string): Observable<Quote> {

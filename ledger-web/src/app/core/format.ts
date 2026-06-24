@@ -16,3 +16,7 @@ export function formatDateTime(value: string): string {
     `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`,
   ].join(' ');
 }
+
+export function normalizeAmount(input: string): string {
+  return input.trim().replace(',', '.');
+}
