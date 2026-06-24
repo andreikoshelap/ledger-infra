@@ -105,7 +105,7 @@ Frontend:
 ```bash
 cd ledger-web
 npm install
-ng serve --proxy-config proxy.conf.json
+ng serve
 ```
 Locally frontend is exposed on `http://localhost:4200`.
 
@@ -118,7 +118,7 @@ docker compose down -v
 docker compose up --build -d
 ```
 
-Frontend is exposed on `http://localhost:8080`.
+Frontend is exposed on `http://localhost:8081`.
 
 ## Repo Layout
 
