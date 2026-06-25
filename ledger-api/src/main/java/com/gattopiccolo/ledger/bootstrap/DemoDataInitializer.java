@@ -31,6 +31,11 @@ public class DemoDataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        if (!service.listAccounts(DEMO_USER).isEmpty()) {
+            log.info("Demo data already exists for user={}, skipping seed", DEMO_USER);
+            return;
+        }
+
         Long eur = service.openAccount(DEMO_USER, CurrencyCode.EUR);
         Long usd = service.openAccount(DEMO_USER, CurrencyCode.USD);
         Long vnd = service.openAccount(DEMO_USER, CurrencyCode.VND);
@@ -41,6 +46,7 @@ public class DemoDataInitializer implements CommandLineRunner {
         service.debit(eur, new BigDecimal("120.50"));
         service.exchange(DEMO_USER, eur, usd, new BigDecimal("100.00"));
 
-        log.info("Demo data ready: user={}, EUR account={}, USD account={}", DEMO_USER, eur, usd);
+        log.info("Demo data ready: user={}, EUR account={}, USD account={}, VND account={}",
+                DEMO_USER, eur, usd, vnd);
     }
 }
