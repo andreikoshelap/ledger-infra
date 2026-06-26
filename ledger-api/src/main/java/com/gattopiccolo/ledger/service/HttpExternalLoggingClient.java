@@ -28,7 +28,7 @@ public class HttpExternalLoggingClient implements ExternalLoggingClient {
             http.get().uri("https://httpstat.us/200").retrieve().toBodilessEntity();
         } catch (Exception ex) {                         // connect timeout, 5xx
             throw new ExternalLoggingException("External logging call failed before " +
-                    "debit on account" +accountId, ex);
+                    "debit on account " +accountId, ex);
         }
     }
 }
