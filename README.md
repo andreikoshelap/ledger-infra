@@ -79,10 +79,25 @@ Key decisions in `ledger-api`:
 
 ## Profiles
 
-Backend runtime is split by profile:
+Backend runtime is split by database profile and external-check profile.
 
-- default local run: H2
-- Docker run: PostgreSQL + Flyway
+Database/runtime:
+
+- local `bootRun`: H2 with Hibernate `create-drop`
+- Docker: PostgreSQL + Flyway via `docker` profile
+
+External pre-debit check:
+
+- `demo`: bypasses external checking and uses `NoOpExternalLoggingClient`
+- `prod`: uses the task-required endpoint, `https://httpstat.us/200`
+- `postman`: uses `https://postman-echo.com/status/200`
+
+`postman` is the default local profile because `httpstat.us` is currently
+unreliable. The `prod` profile is kept to show the task-required integration
+point, but it may fail when `httpstat.us` is unavailable.
+
+Docker runs with `docker,postman`: PostgreSQL + Flyway, plus the stable external
+check endpoint.
 
 Files:
 
@@ -97,8 +112,15 @@ Backend:
 cd ledger-api
 ./gradlew test
 ./gradlew bootRun
+./gradlew bootRun --args='--spring.profiles.active=prod'
 ./gradlew bootRun --args='--spring.profiles.active=demo'
 ```
+
+Use plain `bootRun` for the normal local run. It resolves to the default
+`postman` profile and performs the external pre-debit check against Postman
+Echo. Use `prod` only when you explicitly want to exercise the task-required
+`httpstat.us` endpoint. Use `demo` when you want seeded demo data and no
+external pre-debit check.
 
 Frontend:
 

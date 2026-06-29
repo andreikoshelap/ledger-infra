@@ -1,15 +1,14 @@
 spring:
   application:
     name: ledger
+  profiles:
+    default: postman
   datasource:
     url: jdbc:h2:mem:ledgerdb;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000
     username: sa
     password: ""
   jpa:
     hibernate:
-      # Schema is generated from entities (incl. @Check constraints) so the app
-      # boots out-of-the-box. For a Flyway-managed schema set this to "none" and
-      # flyway.enabled to true.
       ddl-auto: create-drop
     open-in-view: false
     properties:
@@ -24,9 +23,44 @@ spring:
 
 ledger:
   external-logging:
-    # Demo integration. Disabled by default so local runs do not depend on a public endpoint.
-    enabled: false
     base-url: https://httpstat.us
     path: /200
     connect-timeout-ms: 2000
     read-timeout-ms: 2000
+
+---
+
+spring:
+  config:
+    activate:
+      on-profile: demo
+
+ledger:
+  external-logging:
+    enabled: false
+
+---
+
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+ledger:
+  external-logging:
+    enabled: true
+    base-url: https://httpstat.us
+    path: /200
+
+---
+
+spring:
+  config:
+    activate:
+      on-profile: postman
+
+ledger:
+  external-logging:
+    enabled: true
+    base-url: https://postman-echo.com
+    path: /status/200

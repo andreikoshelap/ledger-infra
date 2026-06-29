@@ -1,4 +1,6 @@
 spring:
+  profiles:
+    default: prod
   datasource:
     url: jdbc:h2:mem:ledgerdb;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000
     hikari:
@@ -17,3 +19,40 @@ ledger:
   external-logging:
     base-url: http://localhost:0
     path: /200
+
+---
+
+spring:
+  config:
+    activate:
+      on-profile: demo
+
+ledger:
+  external-logging:
+    enabled: false
+
+---
+
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+ledger:
+  external-logging:
+    enabled: true
+    base-url: https://httpstat.us
+    path: /200
+
+---
+
+spring:
+  config:
+    activate:
+      on-profile: postman
+
+ledger:
+  external-logging:
+    enabled: true
+    base-url: https://postman-echo.com
+    path: /status/200
