@@ -1,0 +1,55 @@
+# This is the core interview-relevant object: Deployment.
+# Deployment -> manages a ReplicaSet -> which manages Pods.
+# You almost never create Pods or ReplicaSets directly; Deployment gives you
+# rolling updates, rollback, and self-healing on top of them.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ledger-api
+  namespace: ledger
+  labels:
+    app: ledger-api
+spec:
+  replicas: 3                     # 3 pods -> survives 1 node/pod failure, enables rolling updates
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1          # at most 1 pod down during a rollout
+      maxSurge: 1                # at most 1 extra pod spun up above `replicas` during rollout
+  selector:
+    matchLabels:
+      app: ledger-api
+  template:
+    metadata:
+      labels:
+        app: ledger-api
+    spec:
+      containers:
+        - name: ledger-api
+          image: ledger-api:local        # built locally, see README for `kind load docker-image`
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: ledger-api-config
+            - secretRef:
+                name: ledger-api-secret
+          resources:
+            requests:              # what the scheduler reserves for this pod on a node
+              cpu: "250m"
+              memory: "256Mi"
+            limits:                 # hard ceiling; exceeding memory limit -> OOMKilled
+              cpu: "500m"
+              memory: "512Mi"
+          readinessProbe:           # "can this pod receive traffic right now?"
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:            # "is this pod still alive, or should k8s restart it?"
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 20

@@ -1,0 +1,14 @@
+# ConfigMap = non-secret configuration, injected as env vars into the Pod.
+# Think of it as the K8s-native replacement for your .env file in voyage-log/gatto.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ledger-api-config
+  namespace: ledger
+data:
+  SPRING_PROFILES_ACTIVE: "kubernetes"
+  DB_HOST: "ledger-postgres"       # matches the Postgres Service name below
+  DB_PORT: "5432"
+  DB_NAME: "ledger"
+  SERVER_PORT: "8080"
+  LOG_LEVEL: "INFO"

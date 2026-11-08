@@ -1,0 +1,37 @@
+# Service = stable internal DNS name + load-balancing across the 3 ledger-api pods,
+# whose individual IPs change every time a pod is rescheduled.
+apiVersion: v1
+kind: Service
+metadata:
+  name: ledger-api
+  namespace: ledger
+spec:
+  selector:
+    app: ledger-api          # routes to any Pod with this label — this is how Service finds Pods
+  ports:
+    - port: 80
+      targetPort: 8080
+  type: ClusterIP             # internal-only; not reachable from outside the cluster
+---
+# Ingress = HTTP(S) routing layer in front of one or more Services (host/path based),
+# plus usually TLS termination. Needs an Ingress Controller (e.g. nginx) running in the cluster.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ledger-api-ingress
+  namespace: ledger
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: ledger-api.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ledger-api
+                port:
+                  number: 80

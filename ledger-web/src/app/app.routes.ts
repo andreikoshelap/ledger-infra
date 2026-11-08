@@ -26,5 +26,11 @@ export const routes: Routes = [
       import('./accounts/account-overview/account-overview-page/account-overview-page')
         .then(m => m.AccountOverviewPage),
   },
+  {
+    path: 'security',
+    title: 'Security',
+    loadComponent: () =>
+      import('./security/security-page/security-page').then(m => m.SecurityPage),
+  },
   { path: '**', redirectTo: 'accounts' },
 ];

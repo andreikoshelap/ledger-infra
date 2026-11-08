@@ -1,0 +1,131 @@
+<div class="security-page">
+  <header class="hero">
+    <div>
+      <p class="hero__eyebrow">Threat observability · prototype</p>
+      <h1 class="hero__title">Security findings</h1>
+      <p class="hero__copy">
+        Raw API events are detected by rules, enriched with threat intel and asset context,
+        scored, and deduplicated into a short list an analyst can actually work through.
+      </p>
+      <p class="hero__copy"><a routerLink="/accounts">← Back to accounts</a></p>
+    </div>
+    @if (store.summary(); as summary) {
+      <div class="hero__meta">
+        <div class="metric">
+          <span class="metric__label">Raw events</span>
+          <span class="metric__value">{{ summary.rawEvents }}</span>
+        </div>
+        <div class="metric">
+          <span class="metric__label">Findings opened</span>
+          <span class="metric__value">{{ summary.findingsCreated }}</span>
+        </div>
+        <div class="metric">
+          <span class="metric__label">Duplicates folded</span>
+          <span class="metric__value">{{ summary.suppressedDuplicates }}</span>
+        </div>
+        <div class="metric">
+          <span class="metric__label">Noise reduction</span>
+          <span class="metric__value">{{ summary.noiseReductionPct }}%</span>
+        </div>
+      </div>
+    }
+  </header>
+
+  <section class="panel">
+    <div class="section-head">
+      <h2>Findings</h2>
+      <div class="section-actions">
+        <label class="toggle">
+          <input type="checkbox" [checked]="hideResolved()" (change)="toggleResolved()" />
+          Hide resolved
+        </label>
+        <button type="button" class="secondary-button" (click)="refresh()" [disabled]="store.loading()">
+          Refresh
+        </button>
+      </div>
+    </div>
+
+    @if (store.loading() && store.findings().length === 0) {
+      <p class="state">Loading findings…</p>
+    } @else if (store.error()) {
+      <p class="state state--error">{{ store.error() }}</p>
+    } @else if (visibleFindings().length === 0) {
+      <p class="state">No findings. Generate some traffic with docs/threat-demo.sh.</p>
+    } @else {
+      <ul class="findings">
+        @for (finding of visibleFindings(); track finding.id) {
+          <li class="finding" [class]="'finding severity-' + finding.severity.toLowerCase()">
+            <div class="finding__score" [attr.aria-label]="'Risk score ' + finding.riskScore">
+              {{ finding.riskScore }}
+            </div>
+            <div class="finding__body">
+              <div class="finding__top">
+                <strong>{{ finding.title }}</strong>
+                <span class="chip chip--severity">{{ finding.severity }}</span>
+                <span class="chip">{{ finding.status }}</span>
+                @if (finding.occurrenceCount > 1) {
+                  <span class="chip chip--count">×{{ finding.occurrenceCount }}</span>
+                }
+              </div>
+              <p class="finding__evidence">{{ finding.evidence }}</p>
+              <p class="finding__meta">
+                {{ finding.ruleId }} · {{ finding.owaspCategory }} ·
+                {{ finding.attackTactic }} / {{ finding.attackTechnique }}
+              </p>
+              <p class="finding__meta">
+                actor {{ finding.actor }} · ip {{ finding.sourceIp }}
+                @if (finding.intel) { · intel {{ finding.intel }} }
+                · last seen {{ finding.lastSeen | date: 'short' }}
+              </p>
+            </div>
+            <div class="finding__actions">
+              @if (finding.status === 'OPEN') {
+                <button type="button" class="secondary-button"
+                        (click)="store.setStatus({ id: finding.id, status: 'ACKNOWLEDGED' })">
+                  Acknowledge
+                </button>
+              }
+              @if (finding.status !== 'RESOLVED') {
+                <button type="button" class="secondary-button"
+                        (click)="store.setStatus({ id: finding.id, status: 'RESOLVED' })">
+                  Resolve
+                </button>
+              }
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+
+  <section class="panel">
+    <div class="section-head">
+      <h2>Vulnerability priorities</h2>
+      <span class="section-head__hint">
+        Sample data. Ranked by CVSS, EPSS, known exploitation, exposure and runtime context.
+      </span>
+    </div>
+    <table class="vulns">
+      <thead>
+        <tr>
+          <th>Priority</th>
+          <th>CVE</th>
+          <th>Component</th>
+          <th>CVSS</th>
+          <th>Why</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (item of store.vulnerabilities(); track item.finding.cveId) {
+          <tr>
+            <td><span class="chip">{{ item.tier }}</span> <small>{{ item.priorityScore }}</small></td>
+            <td>{{ item.finding.cveId }}</td>
+            <td>{{ item.finding.component }} {{ item.finding.version }}</td>
+            <td>{{ item.finding.cvss }}</td>
+            <td>{{ item.rationale }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </section>
+</div>
