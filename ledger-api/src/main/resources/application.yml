@@ -27,6 +27,18 @@ ledger:
     path: /200
     connect-timeout-ms: 2000
     read-timeout-ms: 2000
+  # Threat-observability module (see docs/threat-observability.md). All values are optional.
+  security:
+    enabled: true
+    window: 5m
+    enumeration-threshold: 5
+    debit-velocity-threshold: 10
+    client-error-threshold: 10
+    suppression: 1h
+    trust-forwarded-for: false
+    # Static threat-intel feed (ip -> label). 203.0.113.0/24 is a documentation range.
+    malicious-ips:
+      "203.0.113.66": sample-threat-feed
 
 ---
 

@@ -19,6 +19,9 @@ ledger:
   external-logging:
     base-url: http://localhost:0
     path: /200
+  security:
+    malicious-ips:
+      "203.0.113.66": sample-threat-feed
 
 ---
 

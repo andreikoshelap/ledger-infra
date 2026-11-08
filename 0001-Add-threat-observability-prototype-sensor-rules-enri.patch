@@ -1,0 +1,3264 @@
+From e958ed7a514a8997ade0704c6c1859dd027658dc Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 8 Nov 2026 19:44:46 +0200
+Subject: [PATCH] Add threat-observability prototype (sensor, rules,
+ enrichment, findings UI)
+
+A request sensor turns /api/accounts/** calls into security events. Four
+detection rules (BOLA, account enumeration, debit velocity, client-error
+probing) are mapped to OWASP Top 10:2025 and MITRE ATT&CK, enriched with
+threat intel and account value, scored, and deduplicated into persisted
+findings. Adds /api/security/* endpoints, a Flyway migration, an Angular
+Security page, sample vulnerability prioritisation (CVSS/EPSS/KEV/runtime
+context), a demo traffic script and docs with an interview cheat sheet.
+
+The sensor detects but does not fix the missing object-level authorisation
+in the existing account endpoints; this is documented in the new docs.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Wg8FWKiWFyvZx5uDJe5DLP
+---
+ docs/threat-demo.sh                           |  35 +++
+ docs/threat-observability.md                  | 222 ++++++++++++++++++
+ .../ledger/threat/DetectionEngine.java        |  46 ++++
+ .../gattopiccolo/ledger/threat/EventType.java |  13 +
+ .../ledger/threat/EventWindow.java            |  68 ++++++
+ .../gattopiccolo/ledger/threat/Finding.java   | 204 ++++++++++++++++
+ .../ledger/threat/FindingRepository.java      |  21 ++
+ .../ledger/threat/FindingService.java         | 122 ++++++++++
+ .../ledger/threat/FindingStatus.java          |  12 +
+ .../ledger/threat/RiskScorer.java             |  43 ++++
+ .../ledger/threat/SecurityEvent.java          |  37 +++
+ .../threat/SecurityEventInterceptor.java      | 108 +++++++++
+ .../ledger/threat/SecurityProperties.java     |  42 ++++
+ .../ledger/threat/SecurityWebConfig.java      |  25 ++
+ .../gattopiccolo/ledger/threat/Severity.java  |  23 ++
+ .../ledger/threat/ThreatConfig.java           |  56 +++++
+ .../ledger/threat/enrich/IpReputation.java    |  27 +++
+ .../enrich/StaticThreatIntelProvider.java     |  46 ++++
+ .../threat/enrich/ThreatIntelProvider.java    |  11 +
+ .../threat/rule/AccountEnumerationRule.java   |  70 ++++++
+ .../threat/rule/ClientErrorProbingRule.java   |  58 +++++
+ .../ledger/threat/rule/DebitVelocityRule.java |  63 +++++
+ .../ledger/threat/rule/Detection.java         |  31 +++
+ .../ledger/threat/rule/DetectionRule.java     |  17 ++
+ .../threat/rule/ForeignAccountAccessRule.java |  55 +++++
+ .../threat/vuln/PrioritizedVulnerability.java |   8 +
+ .../vuln/SampleVulnerabilityCatalog.java      |  24 ++
+ .../threat/vuln/VulnerabilityFinding.java     |  20 ++
+ .../threat/vuln/VulnerabilityPrioritizer.java |  63 +++++
+ .../ledger/threat/web/ThreatController.java   | 109 +++++++++
+ ledger-api/src/main/resources/application.yml |  12 +
+ .../db/migration/V3__security_finding.sql     |  25 ++
+ .../ledger/threat/DetectionPipelineTest.java  | 106 +++++++++
+ .../ledger/threat/EventWindowTest.java        |  50 ++++
+ .../ledger/threat/RiskScorerTest.java         |  38 +++
+ .../enrich/StaticThreatIntelProviderTest.java |  39 +++
+ .../threat/rule/DetectionRulesTest.java       | 179 ++++++++++++++
+ .../vuln/VulnerabilityPrioritizerTest.java    |  58 +++++
+ ledger-api/src/test/resources/application.yml |   3 +
+ .../accounts/accounts-page/accounts-page.html |   1 +
+ .../accounts-page/accounts-page.spec.ts       |   2 +
+ ledger-web/src/app/app.routes.ts              |   6 +
+ ledger-web/src/app/core/api/security-api.ts   |  31 +++
+ ledger-web/src/app/core/models/security.ts    |  51 ++++
+ .../security/security-page/security-page.css  | 220 +++++++++++++++++
+ .../security/security-page/security-page.html | 131 +++++++++++
+ .../security-page/security-page.spec.ts       |  89 +++++++
+ .../security/security-page/security-page.ts   |  29 +++
+ ledger-web/src/app/security/security.store.ts |  74 ++++++
+ 49 files changed, 2823 insertions(+)
+ create mode 100755 docs/threat-demo.sh
+ create mode 100644 docs/threat-observability.md
+ create mode 100644 ledger-api/src/main/java/com/gattopiccolo/ledger/threat/DetectionEngine.java
+ create mode 100644 ledger-api/src/main/java/com/gattopiccolo/ledger/threat/EventType.java
+ create mode 100644 ledger-api/src/main/java/com/gattopiccolo/ledger/threat/EventWindow.java
+ create mode 100644 ledger-api/src/main/java/com/gattopiccolo/ledger/threat/Finding.java
+ create mode 100644 ledger-api/src/main/java/com/gattopiccolo/ledger/threat/FindingRepository.java
+ create mode 100644 ledger-api/src/main/java/com/gattopiccolo/ledger/threat/FindingService.java
+ create mode 100644 ledger-api/src/main/java/com/gattopiccolo/ledger/threat/FindingStatus.java
+ create mode 100644 ledger-api/src/main/java/com/gattopiccolo/ledger/threat/RiskScorer.java
+ create mode 100644 ledger-api/src/main/java/com/gattopiccolo/ledger/threat/SecurityEvent.java
+ create mode 100644 ledger-api/src/main/java/com/gattopiccolo/ledger/threat/SecurityEventInterceptor.java
+ create mode 100644 ledger-api/src/main/java/com/gattopiccolo/ledger/threat/SecurityProperties.java
+ create mode 100644 ledger-api/src/main/java/com/gattopiccolo/ledger/threat/SecurityWebConfig.java
+ create mode 100644 ledger-api/src/main/java/com/gattopiccolo/ledger/threat/Severity.java
+ create mode 100644 ledger-api/src/main/java/com/gattopiccolo/ledger/threat/ThreatConfig.java
+ create mode 100644 ledger-api/src/main/java/com/gattopiccolo/ledger/threat/enrich/IpReputation.java
+ create mode 100644 ledger-api/src/main/java/com/gattopiccolo/ledger/threat/enrich/StaticThreatIntelProvider.java
+ create mode 100644 ledger-api/src/main/java/com/gattopiccolo/ledger/threat/enrich/ThreatIntelProvider.java
+ create mode 100644 ledger-api/src/main/java/com/gattopiccolo/ledger/threat/rule/AccountEnumerationRule.java
+ create mode 100644 ledger-api/src/main/java/com/gattopiccolo/ledger/threat/rule/ClientErrorProbingRule.java
+ create mode 100644 ledger-api/src/main/java/com/gattopiccolo/ledger/threat/rule/DebitVelocityRule.java
+ create mode 100644 ledger-api/src/main/java/com/gattopiccolo/ledger/threat/rule/Detection.java
+ create mode 100644 ledger-api/src/main/java/com/gattopiccolo/ledger/threat/rule/DetectionRule.java
+ create mode 100644 ledger-api/src/main/java/com/gattopiccolo/ledger/threat/rule/ForeignAccountAccessRule.java
+ create mode 100644 ledger-api/src/main/java/com/gattopiccolo/ledger/threat/vuln/PrioritizedVulnerability.java
+ create mode 100644 ledger-api/src/main/java/com/gattopiccolo/ledger/threat/vuln/SampleVulnerabilityCatalog.java
+ create mode 100644 ledger-api/src/main/java/com/gattopiccolo/ledger/threat/vuln/VulnerabilityFinding.java
+ create mode 100644 ledger-api/src/main/java/com/gattopiccolo/ledger/threat/vuln/VulnerabilityPrioritizer.java
+ create mode 100644 ledger-api/src/main/java/com/gattopiccolo/ledger/threat/web/ThreatController.java
+ create mode 100644 ledger-api/src/main/resources/db/migration/V3__security_finding.sql
+ create mode 100644 ledger-api/src/test/java/com/gattopiccolo/ledger/threat/DetectionPipelineTest.java
+ create mode 100644 ledger-api/src/test/java/com/gattopiccolo/ledger/threat/EventWindowTest.java
+ create mode 100644 ledger-api/src/test/java/com/gattopiccolo/ledger/threat/RiskScorerTest.java
+ create mode 100644 ledger-api/src/test/java/com/gattopiccolo/ledger/threat/enrich/StaticThreatIntelProviderTest.java
+ create mode 100644 ledger-api/src/test/java/com/gattopiccolo/ledger/threat/rule/DetectionRulesTest.java
+ create mode 100644 ledger-api/src/test/java/com/gattopiccolo/ledger/threat/vuln/VulnerabilityPrioritizerTest.java
+ create mode 100644 ledger-web/src/app/core/api/security-api.ts
+ create mode 100644 ledger-web/src/app/core/models/security.ts
+ create mode 100644 ledger-web/src/app/security/security-page/security-page.css
+ create mode 100644 ledger-web/src/app/security/security-page/security-page.html
+ create mode 100644 ledger-web/src/app/security/security-page/security-page.spec.ts
+ create mode 100644 ledger-web/src/app/security/security-page/security-page.ts
+ create mode 100644 ledger-web/src/app/security/security.store.ts
+
+diff --git a/docs/threat-demo.sh b/docs/threat-demo.sh
+new file mode 100755
+index 0000000..ff9e82e
+--- /dev/null
++++ b/docs/threat-demo.sh
+@@ -0,0 +1,35 @@
++#!/usr/bin/env bash
++# Generates attacker-like traffic against a locally running ledger-api so the
++# Security page has something to show. Start the backend first:
++#
++#   cd ledger-api
++#   ./gradlew bootRun --args='--spring.profiles.active=demo --ledger.security.trust-forwarded-for=true'
++#
++# The demo profile seeds user 1 with accounts 1..3 and disables the external
++# pre-debit check. Safe to run repeatedly; it only talks to localhost by default.
++set -euo pipefail
++
++BASE="${BASE:-http://localhost:8080}"
++BAD_IP="203.0.113.66"   # listed in ledger.security.malicious-ips (documentation range)
++
++call() { # user method path [json-body] [source-ip]
++  local user="$1" method="$2" path="$3" body="${4:-}" ip="${5:-198.51.100.7}"
++  local args=(-s -o /dev/null -w "%{http_code} ${method} ${path} (user ${user})\n" \
++    -X "$method" -H "X-User-Id: ${user}" -H "X-Forwarded-For: ${ip}")
++  if [[ -n "$body" ]]; then args+=(-H "Content-Type: application/json" -d "$body"); fi
++  curl "${args[@]}" "${BASE}${path}"
++}
++
++echo "== 1. Attacker (user 7) reads another user's accounts and enumerates ids"
++for id in $(seq 1 12); do call 7 GET "/api/accounts/${id}/balance"; done
++
++echo "== 2. Same attacker, known-bad address, deposits into a foreign account"
++call 7 POST "/api/accounts/1/deposit" '{"amount":"1.00"}' "$BAD_IP"
++
++echo "== 3. Legitimate owner (user 1) drains an account in a burst of debits"
++for _ in $(seq 1 12); do call 1 POST "/api/accounts/1/debit" '{"amount":"0.01"}'; done
++
++echo
++echo "Summary:"
++curl -s "${BASE}/api/security/summary"; echo
++echo "Open http://localhost:4200/security (ng serve) or GET ${BASE}/api/security/findings"
+diff --git a/docs/threat-observability.md b/docs/threat-observability.md
+new file mode 100644
+index 0000000..95376b6
+--- /dev/null
++++ b/docs/threat-observability.md
+@@ -0,0 +1,222 @@
++# Threat observability prototype
++
++A small "threat observability" layer on top of the ledger API. It watches the
++account API, detects suspicious behaviour, enriches and scores it, and folds
++the noise into a short list of findings an analyst can act on.
++
++It is a learning prototype: the point is to show the *shape* of such a system
++(sensor -> events -> detections -> enrichment -> scoring -> findings), not to be
++a production SIEM.
++
++## Pipeline
++
++```
++HTTP request
++   |
++   v
++SecurityEventInterceptor   (sensor: builds a SecurityEvent after each /api/accounts/** call)
++   |
++   v
++DetectionEngine            (buffers the event in EventWindow, runs every DetectionRule)
++   |   Detection = one rule hit, mapped to OWASP + MITRE ATT&CK
++   v
++FindingService             (enrich + score + deduplicate)
++   |   - ThreatIntelProvider: is the source IP known-bad?
++   |   - account balance: how valuable is the target?
++   |   - fingerprint: same rule + actor + IP => same finding, occurrenceCount++
++   v
++Finding (security_finding table)  ->  /api/security/*  ->  Angular "Security" page
++```
++
++Code lives in `ledger-api/src/main/java/com/gattopiccolo/ledger/threat`.
++Everything except the thin Spring/JPA wiring is plain Java with no framework
++dependencies, which keeps the logic easy to unit-test.
++
++## Detection rules
++
++| Rule | What it detects | OWASP Top 10:2025 | MITRE ATT&CK |
++|---|---|---|---|
++| LEDGER-001 | A caller touches an account owned by someone else (BOLA/IDOR). Critical if a state-changing call succeeded, high if a read succeeded, medium if rejected. | A01 Broken Access Control | T1190 Exploit Public-Facing Application (Initial Access) |
++| LEDGER-002 | One actor probes many foreign or non-existent account ids in a window (enumeration). | A01 Broken Access Control | T1087 Account Discovery (Discovery) |
++| LEDGER-003 | Burst of successful debits from one actor. | A06 Insecure Design (no rate limiting) | T1657 Financial Theft (Impact) |
++| LEDGER-004 | Many 4xx responses for one actor (probing, fuzzing). Low severity context. | A06 Insecure Design (no rate limiting) | T1595 Active Scanning (Reconnaissance) |
++
++Thresholds are configurable under `ledger.security.*` (see `application.yml`).
++
++## Fighting alert fatigue
++
++1. **Aggregation windows**: rules count events per actor over a sliding window
++   instead of alerting on single requests.
++2. **Deduplication**: detections with the same fingerprint
++   (`rule:actor:ip`) fold into one active finding; `occurrenceCount` grows and
++   severity/score only ever go up. A resolved finding is not reused, so a
++   recurrence after triage opens a new one.
++3. **Risk-based ordering**: findings are sorted by score, not by arrival time.
++4. **Measured**: `GET /api/security/summary` reports raw events, findings
++   opened, duplicates folded and the resulting noise reduction.
++
++## Enrichment and scoring
++
++```
++riskScore = min(100, baseScore(severity) x assetMultiplier x intelMultiplier)
++baseScore:        LOW 10, MEDIUM 30, HIGH 60, CRITICAL 90
++assetMultiplier:  balance >= 10 000 -> 1.5, >= 1 000 -> 1.2, else 1.0
++intelMultiplier:  source IP listed in the threat-intel feed -> 1.5, else 1.0
++```
++
++A teaching heuristic, not a standard. The threat-intel feed is a static map in
++configuration (`ledger.security.malicious-ips`); the `ThreatIntelProvider`
++interface is where a real feed (with caching and timeouts) would plug in.
++
++## Vulnerability prioritisation
++
++`GET /api/security/vulnerabilities` ranks **sample** dependency findings
++(fictional CVE-2099-xxxx ids) with:
++
++```
++score = cvss/10 x 40 + epss x 30 + 20 (known exploited) + 10 (internet exposed)
++score x= 0.4 when the library is not loaded at runtime
++```
++
++The same CVSS can land in different tiers depending on exploitation signals and
++runtime context. Replace `SampleVulnerabilityCatalog` with an SCA/advisory
++feed (for example OSV) to make it real.
++
++## API
++
++| Endpoint | Purpose |
++|---|---|
++| `GET /api/security/findings?status=&minScore=` | Findings, highest risk first |
++| `GET /api/security/findings/{id}` | One finding |
++| `POST /api/security/findings/{id}/status` | `{ "status": "ACKNOWLEDGED" \| "RESOLVED" \| "OPEN" }` |
++| `GET /api/security/events?limit=&actor=` | Recent raw events (investigation context) |
++| `GET /api/security/summary` | Noise metrics |
++| `GET /api/security/vulnerabilities` | Prioritised sample vulnerabilities |
++
++## Try it
++
++```bash
++cd ledger-api
++./gradlew bootRun --args='--spring.profiles.active=demo --ledger.security.trust-forwarded-for=true'
++# in another shell
++docs/threat-demo.sh
++# then open the UI (ng serve) at http://localhost:4200/security
++```
++
++`trust-forwarded-for` is only for the demo, so the script can simulate a source
++address from the threat-intel feed. Never enable it unless a proxy you control
++sets the header.
++
++## Findings about the existing application (not fixed here)
++
++Building the sensor surfaced real weaknesses in the ledger itself. The module
++*detects* them; it does not fix them.
++
++- **Broken object level authorisation (OWASP A01).** `GET /accounts/{id}`,
++  `/balance`, `/transactions`, `/transactions/{entryId}`, `POST /deposit`,
++  `POST /debit` and `GET /quote` never check that the account belongs to the
++  caller. Only `exchange` scopes by `userId`. Fix: resolve the account with
++  `findByIdAndUserId` (the repository method already exists) and return 404
++  otherwise.
++- **Client-asserted identity (OWASP A07).** The caller is whatever the
++  `X-User-Id` header says, and the Angular interceptor hard-codes `1`. Real
++  authentication (session or token) must supply the identity.
++- **Unauthenticated security API.** `/api/security/**` follows the rest of the
++  app and has no access control.
++
++## Prototype limits
++
++- Events live in a bounded in-memory buffer; findings are persisted. A restart
++  clears the noise counters and the event history.
++- Processing is serialised in one JVM. Scaling out needs a shared store or
++  partitioning by actor (for example a Kafka topic keyed by actor).
++- Rules see only what the HTTP layer exposes: no request bodies, so amounts are
++  not analysed.
++
++---
++
++# Interview cheat sheet
++
++## OWASP Top 10:2025
++
++An awareness list of the ten most critical web-application risks, updated
++every few years from CVE/CWE data plus a practitioner survey.
++
++| # | Category | One-liner |
++|---|---|---|
++| A01 | Broken Access Control | Users act outside their rights. Now also covers SSRF; BOLA/BFLA called out explicitly. |
++| A02 | Security Misconfiguration | Jumped from #5; defaults, open admin consoles, verbose errors. |
++| A03 | Software Supply Chain Failures | New; vulnerable or tampered dependencies and build pipelines. |
++| A04 | Cryptographic Failures | Weak or missing crypto for data in transit and at rest. |
++| A05 | Injection | Untrusted input interpreted as code (SQL, OS command, XSS). |
++| A06 | Insecure Design | Missing threat modelling, no rate limits, flawed business logic. |
++| A07 | Authentication Failures | Weak login, session and credential handling. |
++| A08 | Software or Data Integrity Failures | Trusting unsigned updates, CI/CD artefacts or serialised data. |
++| A09 | Logging & Alerting Failures | Attacks happen but nobody sees or is alerted. |
++| A10 | Mishandling of Exceptional Conditions | New; errors that fail open or leak internals. |
++
++Say it like this: "BOLA is the most common API flaw: the endpoint checks that
++you are logged in, not that the object is yours. Fix it server-side, per object,
++by always scoping lookups by the authenticated principal."
++
++## CVE, CVSS, EPSS, KEV, vulnerability management
++
++- **CVE**: a public identifier for one specific vulnerability.
++- **CVSS**: severity score 0-10 describing how bad it *could* be. It says
++  nothing about whether anyone is exploiting it.
++- **EPSS**: probability (0-1) that a CVE is exploited in the wild within about
++  30 days.
++- **KEV**: a catalogue (CISA) of vulnerabilities known to be exploited now.
++- **Vulnerability management** is a loop: discover (SCA/scanners, SBOM) ->
++  prioritise (CVSS + EPSS + KEV + exposure + is the code actually loaded) ->
++  remediate or mitigate -> verify. The point is to fix what is *reachable and
++  exploited* first, not everything with a high CVSS.
++
++## SIEM vs SOAR (and XDR)
++
++- **SIEM**: collects and normalises logs from many sources, correlates them,
++  stores them for search and compliance, raises alerts.
++- **SOAR**: orchestrates and automates the response with playbooks (enrich an
++  IP, open a ticket, isolate a host, notify). It acts on alerts the SIEM raised.
++- **XDR**: vendor-integrated detection and response across endpoint, network,
++  cloud and identity.
++- Dynatrace angle: Grail (data lakehouse) holds observability and security data
++  together, DQL queries it, OpenPipeline ingests and enriches it, Security
++  Investigator supports investigation, workflows automate response. The value
++  claim is security findings *with runtime context*.
++
++## MITRE ATT&CK
++
++A knowledge base of real attacker behaviour: **tactics** (the goal, such as
++Initial Access, Discovery, Impact), **techniques** and sub-techniques (the
++method, `T1190`), plus groups, software and campaigns. It is behaviour, not
++vulnerabilities (that is CVE). Use it to tag detections, measure coverage and
++speak a common language with security teams. Current major release at the time
++of writing is v20 (October 2026); Enterprise has 15 tactics since v19 split
++Defense Evasion into Stealth and Defense Impairment.
++
++## Alert fatigue and noise reduction
++
++Too many low-value alerts train people to ignore all of them. Reduce it by:
++aggregating over windows, deduplicating by fingerprint, correlating related
++signals into one incident, scoring by context (asset value, exposure, intel),
++suppressing known-benign patterns, tuning thresholds from feedback, and
++measuring the ratio of events to actionable findings.
++
++## Threat-intel enrichment
++
++Add context to a raw signal so a human or a playbook can decide quickly:
++IOC reputation (IP, domain, file hash), geography and ASN, whether the asset is
++internet-facing or business-critical, the identity involved, and mapped
++ATT&CK technique. Cache lookups, set timeouts, and degrade gracefully when the
++feed is down.
++
++## Thirty-second story about this prototype
++
++"I added a small threat-observability module to my ledger project. A sensor
++turns API calls into security events, rules map them to OWASP and ATT&CK, an
++enrichment step adds threat intel and asset value, and a correlation layer
++deduplicates everything into scored findings, so a burst of repeated events
++becomes one finding with an occurrence counter. While building it I found that my own API had
++object-level authorisation gaps, which is exactly the kind of thing such a
++product exists to surface."
+diff --git a/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/DetectionEngine.java b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/DetectionEngine.java
+new file mode 100644
+index 0000000..a50b02d
+--- /dev/null
++++ b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/DetectionEngine.java
+@@ -0,0 +1,46 @@
++package com.gattopiccolo.ledger.threat;
++
++import com.gattopiccolo.ledger.threat.rule.DetectionRule;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++import org.springframework.stereotype.Component;
++
++import java.util.List;
++
++/**
++ * Pipeline entry point: buffer the event, run every rule, hand detections to
++ * the correlation layer. Processing is serialised so deduplication is
++ * race-free on a single instance; scaling out would need a shared store or
++ * keyed partitioning (for example by actor on a Kafka topic).
++ */
++@Component
++public class DetectionEngine {
++
++    private static final Logger log = LoggerFactory.getLogger(DetectionEngine.class);
++
++    private final EventWindow window;
++    private final List<DetectionRule> rules;
++    private final FindingService findings;
++
++    public DetectionEngine(EventWindow window, List<DetectionRule> rules, FindingService findings) {
++        this.window = window;
++        this.rules = rules;
++        this.findings = findings;
++    }
++
++    public synchronized void onEvent(SecurityEvent event) {
++        window.add(event);
++        for (DetectionRule rule : rules) {
++            try {
++                rule.evaluate(event, window).ifPresent(findings::raise);
++            } catch (RuntimeException ex) {
++                // A broken rule must never take the others, or the request, down.
++                log.warn("Detection rule {} failed", rule.id(), ex);
++            }
++        }
++    }
++
++    public EventWindow window() {
++        return window;
++    }
++}
+diff --git a/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/EventType.java b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/EventType.java
+new file mode 100644
+index 0000000..6dc965c
+--- /dev/null
++++ b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/EventType.java
+@@ -0,0 +1,13 @@
++package com.gattopiccolo.ledger.threat;
++
++/** Classification assigned by the sensor ({@link SecurityEventInterceptor}). */
++public enum EventType {
++    /** Ordinary request, kept only as investigation context. */
++    REQUEST,
++    /** The caller touched an account that belongs to a different user. */
++    FOREIGN_ACCOUNT_ACCESS,
++    /** A debit call on the caller's own account. */
++    DEBIT,
++    /** Any other 4xx response. */
++    CLIENT_ERROR
++}
+diff --git a/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/EventWindow.java b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/EventWindow.java
+new file mode 100644
+index 0000000..434de2b
+--- /dev/null
++++ b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/EventWindow.java
+@@ -0,0 +1,68 @@
++package com.gattopiccolo.ledger.threat;
++
++import java.time.Instant;
++import java.util.ArrayDeque;
++import java.util.ArrayList;
++import java.util.Deque;
++import java.util.Iterator;
++import java.util.List;
++import java.util.Objects;
++import java.util.concurrent.atomic.AtomicLong;
++
++/**
++ * Bounded, in-memory buffer of the most recent security events. Rules query it
++ * for sliding-window aggregates (counts, distinct accounts) per actor.
++ *
++ * <p>This is a prototype stand-in for a real event store. It is intentionally
++ * small: when the capacity is reached the oldest event is dropped.
++ */
++public final class EventWindow {
++
++    private final int capacity;
++    private final Deque<SecurityEvent> events = new ArrayDeque<>();
++    private final AtomicLong total = new AtomicLong();
++
++    public EventWindow(int capacity) {
++        if (capacity <= 0) {
++            throw new IllegalArgumentException("capacity must be positive");
++        }
++        this.capacity = capacity;
++    }
++
++    public synchronized void add(SecurityEvent event) {
++        if (events.size() == capacity) {
++            events.removeFirst();
++        }
++        events.addLast(event);
++        total.incrementAndGet();
++    }
++
++    /** Number of events ever added (not just those still buffered). */
++    public long total() {
++        return total.get();
++    }
++
++    /** Events of one actor at or after {@code from}, oldest first. */
++    public synchronized List<SecurityEvent> byActorSince(String actor, Instant from) {
++        List<SecurityEvent> result = new ArrayList<>();
++        for (SecurityEvent e : events) {
++            if (Objects.equals(e.actor(), actor) && !e.at().isBefore(from)) {
++                result.add(e);
++            }
++        }
++        return result;
++    }
++
++    /** Most recent events, newest first, optionally restricted to one actor. */
++    public synchronized List<SecurityEvent> recent(int limit, String actor) {
++        List<SecurityEvent> result = new ArrayList<>();
++        Iterator<SecurityEvent> newestFirst = events.descendingIterator();
++        while (newestFirst.hasNext() && result.size() < limit) {
++            SecurityEvent e = newestFirst.next();
++            if (actor == null || actor.equals(e.actor())) {
++                result.add(e);
++            }
++        }
++        return result;
++    }
++}
+diff --git a/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/Finding.java b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/Finding.java
+new file mode 100644
+index 0000000..8985167
+--- /dev/null
++++ b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/Finding.java
+@@ -0,0 +1,204 @@
++package com.gattopiccolo.ledger.threat;
++
++import com.gattopiccolo.ledger.threat.rule.Detection;
++import jakarta.persistence.Column;
++import jakarta.persistence.Entity;
++import jakarta.persistence.EnumType;
++import jakarta.persistence.Enumerated;
++import jakarta.persistence.GeneratedValue;
++import jakarta.persistence.GenerationType;
++import jakarta.persistence.Id;
++import jakarta.persistence.Table;
++
++import java.time.Instant;
++
++/**
++ * A deduplicated, enriched, scored security finding: what an analyst actually
++ * looks at. Many {@link Detection}s with the same fingerprint fold into one
++ * finding whose {@code occurrenceCount} keeps growing.
++ */
++@Entity
++@Table(name = "security_finding")
++public class Finding {
++
++    private static final int MAX_EVIDENCE = 1000;
++
++    @Id
++    @GeneratedValue(strategy = GenerationType.IDENTITY)
++    private Long id;
++
++    @Column(name = "fingerprint", nullable = false, length = 200)
++    private String fingerprint;
++
++    @Column(name = "rule_id", nullable = false, length = 32)
++    private String ruleId;
++
++    @Column(name = "title", nullable = false, length = 200)
++    private String title;
++
++    @Enumerated(EnumType.STRING)
++    @Column(name = "severity", nullable = false, length = 16)
++    private Severity severity;
++
++    @Column(name = "risk_score", nullable = false)
++    private int riskScore;
++
++    @Enumerated(EnumType.STRING)
++    @Column(name = "status", nullable = false, length = 16)
++    private FindingStatus status;
++
++    @Column(name = "owasp_category", length = 120)
++    private String owaspCategory;
++
++    @Column(name = "attack_tactic", length = 60)
++    private String attackTactic;
++
++    @Column(name = "attack_technique", length = 120)
++    private String attackTechnique;
++
++    @Column(name = "actor", length = 64)
++    private String actor;
++
++    @Column(name = "source_ip", length = 64)
++    private String sourceIp;
++
++    @Column(name = "affected_account_id")
++    private Long affectedAccountId;
++
++    @Column(name = "occurrence_count", nullable = false)
++    private int occurrenceCount;
++
++    @Column(name = "first_seen", nullable = false)
++    private Instant firstSeen;
++
++    @Column(name = "last_seen", nullable = false)
++    private Instant lastSeen;
++
++    @Column(name = "evidence", length = MAX_EVIDENCE)
++    private String evidence;
++
++    @Column(name = "intel", length = 255)
++    private String intel;
++
++    protected Finding() {
++        // for JPA
++    }
++
++    public static Finding from(Detection d, int riskScore, String intel) {
++        Finding f = new Finding();
++        f.fingerprint = d.fingerprint();
++        f.ruleId = d.ruleId();
++        f.title = d.title();
++        f.severity = d.severity();
++        f.riskScore = riskScore;
++        f.status = FindingStatus.OPEN;
++        f.owaspCategory = d.owaspCategory();
++        f.attackTactic = d.attackTactic();
++        f.attackTechnique = d.attackTechnique();
++        f.actor = d.actor();
++        f.sourceIp = d.sourceIp();
++        f.affectedAccountId = d.affectedAccountId();
++        f.occurrenceCount = 1;
++        f.firstSeen = d.at();
++        f.lastSeen = d.at();
++        f.evidence = truncate(d.evidence());
++        f.intel = intel;
++        return f;
++    }
++
++    /** Folds a repeated detection into this finding; severity and score only ever go up. */
++    public void recordOccurrence(Instant at, Severity newSeverity, int newScore, String newEvidence) {
++        occurrenceCount++;
++        if (at.isAfter(lastSeen)) {
++            lastSeen = at;
++        }
++        if (newSeverity.compareTo(severity) > 0) {
++            severity = newSeverity;
++        }
++        riskScore = Math.max(riskScore, newScore);
++        evidence = truncate(newEvidence);
++    }
++
++    public void setStatus(FindingStatus status) {
++        this.status = status;
++    }
++
++    private static String truncate(String value) {
++        if (value == null || value.length() <= MAX_EVIDENCE) {
++            return value;
++        }
++        return value.substring(0, MAX_EVIDENCE);
++    }
++
++    public Long getId() {
++        return id;
++    }
++
++    public String getFingerprint() {
++        return fingerprint;
++    }
++
++    public String getRuleId() {
++        return ruleId;
++    }
++
++    public String getTitle() {
++        return title;
++    }
++
++    public Severity getSeverity() {
++        return severity;
++    }
++
++    public int getRiskScore() {
++        return riskScore;
++    }
++
++    public FindingStatus getStatus() {
++        return status;
++    }
++
++    public String getOwaspCategory() {
++        return owaspCategory;
++    }
++
++    public String getAttackTactic() {
++        return attackTactic;
++    }
++
++    public String getAttackTechnique() {
++        return attackTechnique;
++    }
++
++    public String getActor() {
++        return actor;
++    }
++
++    public String getSourceIp() {
++        return sourceIp;
++    }
++
++    public Long getAffectedAccountId() {
++        return affectedAccountId;
++    }
++
++    public int getOccurrenceCount() {
++        return occurrenceCount;
++    }
++
++    public Instant getFirstSeen() {
++        return firstSeen;
++    }
++
++    public Instant getLastSeen() {
++        return lastSeen;
++    }
++
++    public String getEvidence() {
++        return evidence;
++    }
++
++    public String getIntel() {
++        return intel;
++    }
++}
+diff --git a/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/FindingRepository.java b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/FindingRepository.java
+new file mode 100644
+index 0000000..0854917
+--- /dev/null
++++ b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/FindingRepository.java
+@@ -0,0 +1,21 @@
++package com.gattopiccolo.ledger.threat;
++
++import org.springframework.data.jpa.repository.JpaRepository;
++
++import java.time.Instant;
++import java.util.Collection;
++import java.util.List;
++import java.util.Optional;
++
++public interface FindingRepository extends JpaRepository<Finding, Long> {
++
++    /** The active finding that a repeated detection should be folded into, if any. */
++    Optional<Finding> findFirstByFingerprintAndStatusInAndLastSeenAfterOrderByLastSeenDesc(
++            String fingerprint, Collection<FindingStatus> statuses, Instant after);
++
++    List<Finding> findAllByOrderByRiskScoreDescLastSeenDesc();
++
++    List<Finding> findByStatusOrderByRiskScoreDescLastSeenDesc(FindingStatus status);
++
++    long countByStatusIn(Collection<FindingStatus> statuses);
++}
+diff --git a/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/FindingService.java b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/FindingService.java
+new file mode 100644
+index 0000000..014a268
+--- /dev/null
++++ b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/FindingService.java
+@@ -0,0 +1,122 @@
++package com.gattopiccolo.ledger.threat;
++
++import com.gattopiccolo.ledger.repository.AccountRepository;
++import com.gattopiccolo.ledger.threat.enrich.IpReputation;
++import com.gattopiccolo.ledger.threat.enrich.ThreatIntelProvider;
++import com.gattopiccolo.ledger.threat.rule.Detection;
++import org.springframework.stereotype.Service;
++import org.springframework.transaction.annotation.Transactional;
++import org.springframework.web.server.ResponseStatusException;
++import org.springframework.http.HttpStatus;
++
++import java.time.Instant;
++import java.util.List;
++import java.util.Optional;
++import java.util.concurrent.atomic.AtomicLong;
++
++/**
++ * Correlation layer: enriches each detection with threat intel and asset
++ * context, scores it, and either opens a new finding or folds it into an
++ * existing active one. The ratio of raw events to findings is the prototype's
++ * answer to alert fatigue.
++ */
++@Service
++public class FindingService {
++
++    private static final List<FindingStatus> ACTIVE = List.of(FindingStatus.OPEN, FindingStatus.ACKNOWLEDGED);
++
++    private final FindingRepository findings;
++    private final AccountRepository accounts;
++    private final ThreatIntelProvider intel;
++    private final SecurityProperties props;
++
++    private final AtomicLong detections = new AtomicLong();
++    private final AtomicLong suppressed = new AtomicLong();
++
++    public FindingService(FindingRepository findings,
++                          AccountRepository accounts,
++                          ThreatIntelProvider intel,
++                          SecurityProperties props) {
++        this.findings = findings;
++        this.accounts = accounts;
++        this.intel = intel;
++        this.props = props;
++    }
++
++    @Transactional
++    public Finding raise(Detection d) {
++        detections.incrementAndGet();
++
++        IpReputation reputation = intel.lookup(d.sourceIp());
++        double assetMultiplier = d.affectedAccountId() == null
++                ? 1.0
++                : accounts.findById(d.affectedAccountId())
++                        .map(a -> RiskScorer.assetMultiplier(a.getBalance()))
++                        .orElse(1.0);
++        int score = RiskScorer.score(d.severity(), assetMultiplier, reputation);
++
++        Instant cutoff = d.at().minus(props.suppression());
++        Optional<Finding> existing = findings
++                .findFirstByFingerprintAndStatusInAndLastSeenAfterOrderByLastSeenDesc(
++                        d.fingerprint(), ACTIVE, cutoff);
++        if (existing.isPresent()) {
++            suppressed.incrementAndGet();
++            Finding finding = existing.get();
++            finding.recordOccurrence(d.at(), d.severity(), score, d.evidence());
++            return finding; // managed entity: flushed on commit
++        }
++        return findings.save(Finding.from(d, score, reputation.summary()));
++    }
++
++    @Transactional(readOnly = true)
++    public List<Finding> list(FindingStatus status, int minScore) {
++        List<Finding> all = status == null
++                ? findings.findAllByOrderByRiskScoreDescLastSeenDesc()
++                : findings.findByStatusOrderByRiskScoreDescLastSeenDesc(status);
++        return all.stream().filter(f -> f.getRiskScore() >= minScore).toList();
++    }
++
++    @Transactional(readOnly = true)
++    public Finding get(Long id) {
++        return findings.findById(id).orElseThrow(() -> notFound(id));
++    }
++
++    @Transactional
++    public Finding updateStatus(Long id, FindingStatus status) {
++        Finding finding = findings.findById(id).orElseThrow(() -> notFound(id));
++        finding.setStatus(status);
++        return finding;
++    }
++
++    @Transactional(readOnly = true)
++    public Summary summary(long rawEvents) {
++        long detected = detections.get();
++        long folded = suppressed.get();
++        long created = detected - folded;
++        double reduction = rawEvents == 0 ? 0.0 : 100.0 * (1.0 - (double) created / rawEvents);
++        return new Summary(rawEvents, detected, folded, created,
++                findings.countByStatusIn(ACTIVE), Math.round(reduction * 10) / 10.0);
++    }
++
++    private static ResponseStatusException notFound(Long id) {
++        return new ResponseStatusException(HttpStatus.NOT_FOUND, "Finding " + id + " not found");
++    }
++
++    /**
++     * Noise metrics since application start.
++     *
++     * @param rawEvents          events seen by the sensor
++     * @param detections         rule hits (a single event can hit several rules)
++     * @param suppressedDuplicates detections folded into an existing finding
++     * @param findingsCreated    new findings opened
++     * @param activeFindings     findings currently open or acknowledged
++     * @param noiseReductionPct  100 x (1 - findingsCreated / rawEvents)
++     */
++    public record Summary(long rawEvents,
++                          long detections,
++                          long suppressedDuplicates,
++                          long findingsCreated,
++                          long activeFindings,
++                          double noiseReductionPct) {
++    }
++}
+diff --git a/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/FindingStatus.java b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/FindingStatus.java
+new file mode 100644
+index 0000000..bc72225
+--- /dev/null
++++ b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/FindingStatus.java
+@@ -0,0 +1,12 @@
++package com.gattopiccolo.ledger.threat;
++
++/** Lifecycle of a finding. Only active findings absorb new duplicate detections. */
++public enum FindingStatus {
++    OPEN,
++    ACKNOWLEDGED,
++    RESOLVED;
++
++    public boolean isActive() {
++        return this != RESOLVED;
++    }
++}
+diff --git a/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/RiskScorer.java b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/RiskScorer.java
+new file mode 100644
+index 0000000..06af721
+--- /dev/null
++++ b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/RiskScorer.java
+@@ -0,0 +1,43 @@
++package com.gattopiccolo.ledger.threat;
++
++import com.gattopiccolo.ledger.threat.enrich.IpReputation;
++
++import java.math.BigDecimal;
++
++/**
++ * Turns a detection plus its context into a 0..100 risk score.
++ *
++ * <p>This is the prototype's "findings prioritisation with context":
++ * {@code score = baseScore(severity) x assetMultiplier x intelMultiplier},
++ * capped at 100. A teaching heuristic, not a standard formula.
++ */
++public final class RiskScorer {
++
++    private static final BigDecimal HIGH_VALUE = new BigDecimal("10000");
++    private static final BigDecimal MEDIUM_VALUE = new BigDecimal("1000");
++
++    private RiskScorer() {
++    }
++
++    public static int score(Severity severity, double assetMultiplier, IpReputation intel) {
++        double value = severity.baseScore() * assetMultiplier;
++        if (intel != null && intel.verdict() == IpReputation.Verdict.MALICIOUS) {
++            value *= 1.5;
++        }
++        return (int) Math.min(100, Math.round(value));
++    }
++
++    /** Larger balances make the affected account a more valuable target. */
++    public static double assetMultiplier(BigDecimal balance) {
++        if (balance == null) {
++            return 1.0;
++        }
++        if (balance.compareTo(HIGH_VALUE) >= 0) {
++            return 1.5;
++        }
++        if (balance.compareTo(MEDIUM_VALUE) >= 0) {
++            return 1.2;
++        }
++        return 1.0;
++    }
++}
+diff --git a/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/SecurityEvent.java b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/SecurityEvent.java
+new file mode 100644
+index 0000000..dca2c70
+--- /dev/null
++++ b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/SecurityEvent.java
+@@ -0,0 +1,37 @@
++package com.gattopiccolo.ledger.threat;
++
++import java.time.Instant;
++
++/**
++ * One normalised security-relevant observation, analogous to a log line or a
++ * security event ingested into a SIEM / data lakehouse.
++ *
++ * @param at          event time (rules treat the latest event time as "now")
++ * @param actor       caller identity as claimed by the {@code X-User-Id} header, or {@code anonymous}
++ * @param sourceIp    network address of the caller, may be null
++ * @param accountId   account addressed by the request path, may be null
++ * @param ownerUserId real owner of that account, null when the account does not exist
++ */
++public record SecurityEvent(Instant at,
++                            String actor,
++                            String sourceIp,
++                            String method,
++                            String path,
++                            int status,
++                            Long accountId,
++                            Long ownerUserId,
++                            EventType type) {
++
++    public boolean isSuccess() {
++        return status >= 200 && status < 300;
++    }
++
++    public boolean isClientError() {
++        return status >= 400 && status < 500;
++    }
++
++    public boolean isMutation() {
++        return "POST".equals(method) || "PUT".equals(method)
++                || "PATCH".equals(method) || "DELETE".equals(method);
++    }
++}
+diff --git a/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/SecurityEventInterceptor.java b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/SecurityEventInterceptor.java
+new file mode 100644
+index 0000000..34643af
+--- /dev/null
++++ b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/SecurityEventInterceptor.java
+@@ -0,0 +1,108 @@
++package com.gattopiccolo.ledger.threat;
++
++import com.gattopiccolo.ledger.domain.Account;
++import com.gattopiccolo.ledger.repository.AccountRepository;
++import jakarta.servlet.http.HttpServletRequest;
++import jakarta.servlet.http.HttpServletResponse;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++import org.springframework.stereotype.Component;
++import org.springframework.web.servlet.HandlerInterceptor;
++import org.springframework.web.servlet.HandlerMapping;
++
++import java.time.Instant;
++import java.util.Map;
++
++/**
++ * The "sensor": observes every account API call after it has completed and
++ * turns it into a {@link SecurityEvent}. It never changes the response and
++ * never fails the request; it only reports.
++ *
++ * <p>Note that it detects, it does not prevent: the controllers do not check
++ * that the caller owns the account (see docs/threat-observability.md).
++ */
++@Component
++public class SecurityEventInterceptor implements HandlerInterceptor {
++
++    private static final Logger log = LoggerFactory.getLogger(SecurityEventInterceptor.class);
++    private static final String ANONYMOUS = "anonymous";
++
++    private final DetectionEngine engine;
++    private final AccountRepository accounts;
++    private final SecurityProperties props;
++
++    public SecurityEventInterceptor(DetectionEngine engine, AccountRepository accounts, SecurityProperties props) {
++        this.engine = engine;
++        this.accounts = accounts;
++        this.props = props;
++    }
++
++    @Override
++    public void afterCompletion(HttpServletRequest request, HttpServletResponse response,
++                                Object handler, Exception ex) {
++        try {
++            engine.onEvent(toEvent(request, response));
++        } catch (RuntimeException failure) {
++            log.warn("Security sensor failed for {} {}", request.getMethod(), request.getRequestURI(), failure);
++        }
++    }
++
++    SecurityEvent toEvent(HttpServletRequest request, HttpServletResponse response) {
++        String actor = header(request, "X-User-Id");
++        if (actor == null) {
++            actor = ANONYMOUS;
++        }
++        Long accountId = pathAccountId(request);
++        Long owner = accountId == null ? null
++                : accounts.findById(accountId).map(Account::getUserId).orElse(null);
++
++        int status = response.getStatus();
++        String method = request.getMethod();
++        String path = request.getRequestURI();
++
++        EventType type;
++        if (owner != null && !String.valueOf(owner).equals(actor)) {
++            type = EventType.FOREIGN_ACCOUNT_ACCESS;
++        } else if ("POST".equals(method) && path.endsWith("/debit")) {
++            type = EventType.DEBIT;
++        } else if (status >= 400 && status < 500) {
++            type = EventType.CLIENT_ERROR;
++        } else {
++            type = EventType.REQUEST;
++        }
++        return new SecurityEvent(Instant.now(), actor, sourceIp(request), method, path,
++                status, accountId, owner, type);
++    }
++
++    private String sourceIp(HttpServletRequest request) {
++        if (props.trustForwardedFor()) {
++            String forwarded = header(request, "X-Forwarded-For");
++            if (forwarded != null) {
++                return forwarded.split(",")[0].trim();
++            }
++        }
++        return request.getRemoteAddr();
++    }
++
++    @SuppressWarnings("unchecked")
++    private static Long pathAccountId(HttpServletRequest request) {
++        Object vars = request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
++        if (!(vars instanceof Map<?, ?> map)) {
++            return null;
++        }
++        Object id = ((Map<String, String>) map).get("id");
++        if (id == null) {
++            return null;
++        }
++        try {
++            return Long.valueOf(id.toString());
++        } catch (NumberFormatException e) {
++            return null;
++        }
++    }
++
++    private static String header(HttpServletRequest request, String name) {
++        String value = request.getHeader(name);
++        return (value == null || value.isBlank()) ? null : value.trim();
++    }
++}
+diff --git a/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/SecurityProperties.java b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/SecurityProperties.java
+new file mode 100644
+index 0000000..3724d16
+--- /dev/null
++++ b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/SecurityProperties.java
+@@ -0,0 +1,42 @@
++package com.gattopiccolo.ledger.threat;
++
++import org.springframework.boot.context.properties.ConfigurationProperties;
++
++import java.time.Duration;
++import java.util.Map;
++
++/**
++ * Tunables of the threat-observability module ({@code ledger.security.*}).
++ * Every value has a default, so the module works with no configuration at all.
++ *
++ * @param enabled                  master switch for the request sensor
++ * @param window                   sliding window used by the aggregating rules
++ * @param enumerationThreshold     distinct probed account ids that trigger LEDGER-002
++ * @param debitVelocityThreshold   successful debits per window that trigger LEDGER-003
++ * @param clientErrorThreshold     4xx responses per window that trigger LEDGER-004
++ * @param suppression              how long an active finding keeps absorbing duplicates
++ * @param trustForwardedFor        use the first {@code X-Forwarded-For} hop as source IP;
++ *                                 enable only behind a proxy you control, the header is spoofable
++ * @param maliciousIps             static threat-intel feed: ip -> label
++ */
++@ConfigurationProperties(prefix = "ledger.security")
++public record SecurityProperties(Boolean enabled,
++                                 Duration window,
++                                 Integer enumerationThreshold,
++                                 Integer debitVelocityThreshold,
++                                 Integer clientErrorThreshold,
++                                 Duration suppression,
++                                 Boolean trustForwardedFor,
++                                 Map<String, String> maliciousIps) {
++
++    public SecurityProperties {
++        enabled = enabled == null || enabled;
++        window = window == null ? Duration.ofMinutes(5) : window;
++        enumerationThreshold = enumerationThreshold == null ? 5 : enumerationThreshold;
++        debitVelocityThreshold = debitVelocityThreshold == null ? 10 : debitVelocityThreshold;
++        clientErrorThreshold = clientErrorThreshold == null ? 10 : clientErrorThreshold;
++        suppression = suppression == null ? Duration.ofHours(1) : suppression;
++        trustForwardedFor = trustForwardedFor != null && trustForwardedFor;
++        maliciousIps = maliciousIps == null ? Map.of() : Map.copyOf(maliciousIps);
++    }
++}
+diff --git a/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/SecurityWebConfig.java b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/SecurityWebConfig.java
+new file mode 100644
+index 0000000..a3141ed
+--- /dev/null
++++ b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/SecurityWebConfig.java
+@@ -0,0 +1,25 @@
++package com.gattopiccolo.ledger.threat;
++
++import org.springframework.context.annotation.Configuration;
++import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
++import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
++
++/** Attaches the security sensor to the account API. */
++@Configuration
++public class SecurityWebConfig implements WebMvcConfigurer {
++
++    private final SecurityEventInterceptor sensor;
++    private final SecurityProperties props;
++
++    public SecurityWebConfig(SecurityEventInterceptor sensor, SecurityProperties props) {
++        this.sensor = sensor;
++        this.props = props;
++    }
++
++    @Override
++    public void addInterceptors(InterceptorRegistry registry) {
++        if (props.enabled()) {
++            registry.addInterceptor(sensor).addPathPatterns("/api/accounts/**");
++        }
++    }
++}
+diff --git a/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/Severity.java b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/Severity.java
+new file mode 100644
+index 0000000..dfebacc
+--- /dev/null
++++ b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/Severity.java
+@@ -0,0 +1,23 @@
++package com.gattopiccolo.ledger.threat;
++
++/**
++ * Severity of a detection. The base score is the starting point of the risk
++ * score computed by {@link RiskScorer}; context (asset value, threat intel)
++ * then raises it.
++ */
++public enum Severity {
++    LOW(10),
++    MEDIUM(30),
++    HIGH(60),
++    CRITICAL(90);
++
++    private final int baseScore;
++
++    Severity(int baseScore) {
++        this.baseScore = baseScore;
++    }
++
++    public int baseScore() {
++        return baseScore;
++    }
++}
+diff --git a/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/ThreatConfig.java b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/ThreatConfig.java
+new file mode 100644
+index 0000000..5b65ce4
+--- /dev/null
++++ b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/ThreatConfig.java
+@@ -0,0 +1,56 @@
++package com.gattopiccolo.ledger.threat;
++
++import com.gattopiccolo.ledger.threat.enrich.StaticThreatIntelProvider;
++import com.gattopiccolo.ledger.threat.enrich.ThreatIntelProvider;
++import com.gattopiccolo.ledger.threat.rule.AccountEnumerationRule;
++import com.gattopiccolo.ledger.threat.rule.ClientErrorProbingRule;
++import com.gattopiccolo.ledger.threat.rule.DebitVelocityRule;
++import com.gattopiccolo.ledger.threat.rule.DetectionRule;
++import com.gattopiccolo.ledger.threat.rule.ForeignAccountAccessRule;
++import com.gattopiccolo.ledger.threat.vuln.VulnerabilityPrioritizer;
++import org.springframework.boot.context.properties.EnableConfigurationProperties;
++import org.springframework.context.annotation.Bean;
++import org.springframework.context.annotation.Configuration;
++
++/** Wires the plain-Java threat-observability building blocks into the application. */
++@Configuration
++@EnableConfigurationProperties(SecurityProperties.class)
++public class ThreatConfig {
++
++    private static final int EVENT_BUFFER_SIZE = 2000;
++
++    @Bean
++    EventWindow eventWindow() {
++        return new EventWindow(EVENT_BUFFER_SIZE);
++    }
++
++    @Bean
++    DetectionRule foreignAccountAccessRule() {
++        return new ForeignAccountAccessRule();
++    }
++
++    @Bean
++    DetectionRule accountEnumerationRule(SecurityProperties props) {
++        return new AccountEnumerationRule(props.window(), props.enumerationThreshold());
++    }
++
++    @Bean
++    DetectionRule debitVelocityRule(SecurityProperties props) {
++        return new DebitVelocityRule(props.window(), props.debitVelocityThreshold());
++    }
++
++    @Bean
++    DetectionRule clientErrorProbingRule(SecurityProperties props) {
++        return new ClientErrorProbingRule(props.window(), props.clientErrorThreshold());
++    }
++
++    @Bean
++    ThreatIntelProvider threatIntelProvider(SecurityProperties props) {
++        return new StaticThreatIntelProvider(props.maliciousIps());
++    }
++
++    @Bean
++    VulnerabilityPrioritizer vulnerabilityPrioritizer() {
++        return new VulnerabilityPrioritizer();
++    }
++}
+diff --git a/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/enrich/IpReputation.java b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/enrich/IpReputation.java
+new file mode 100644
+index 0000000..243e768
+--- /dev/null
++++ b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/enrich/IpReputation.java
+@@ -0,0 +1,27 @@
++package com.gattopiccolo.ledger.threat.enrich;
++
++/**
++ * Threat-intelligence verdict for a source address.
++ *
++ * @param label feed or reason that produced the verdict, may be null
++ */
++public record IpReputation(String ip, Verdict verdict, String label) {
++
++    public enum Verdict {
++        /** No information. */
++        UNKNOWN,
++        /** Loopback or private range, not routable from the internet. */
++        INTERNAL,
++        /** Listed in a threat-intel feed. */
++        MALICIOUS
++    }
++
++    public static IpReputation unknown(String ip) {
++        return new IpReputation(ip, Verdict.UNKNOWN, null);
++    }
++
++    /** Short human-readable form stored with the finding. */
++    public String summary() {
++        return label == null ? verdict.name() : verdict.name() + ": " + label;
++    }
++}
+diff --git a/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/enrich/StaticThreatIntelProvider.java b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/enrich/StaticThreatIntelProvider.java
+new file mode 100644
+index 0000000..c47b0d7
+--- /dev/null
++++ b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/enrich/StaticThreatIntelProvider.java
+@@ -0,0 +1,46 @@
++package com.gattopiccolo.ledger.threat.enrich;
++
++import java.net.InetAddress;
++import java.net.UnknownHostException;
++import java.util.Map;
++
++/**
++ * Threat intel backed by a fixed map of known-bad addresses (ip -> label).
++ * Never performs DNS lookups: only literal IP addresses are interpreted.
++ */
++public final class StaticThreatIntelProvider implements ThreatIntelProvider {
++
++    private final Map<String, String> maliciousIps;
++
++    public StaticThreatIntelProvider(Map<String, String> maliciousIps) {
++        this.maliciousIps = Map.copyOf(maliciousIps);
++    }
++
++    @Override
++    public IpReputation lookup(String ip) {
++        if (ip == null || ip.isBlank()) {
++            return IpReputation.unknown(ip);
++        }
++        String label = maliciousIps.get(ip);
++        if (label != null) {
++            return new IpReputation(ip, IpReputation.Verdict.MALICIOUS, label);
++        }
++        if (isInternal(ip)) {
++            return new IpReputation(ip, IpReputation.Verdict.INTERNAL, null);
++        }
++        return IpReputation.unknown(ip);
++    }
++
++    private static boolean isInternal(String ip) {
++        boolean literal = ip.contains(":") || ip.matches("[0-9.]+");
++        if (!literal) {
++            return false; // a hostname would trigger DNS; refuse
++        }
++        try {
++            InetAddress address = InetAddress.getByName(ip);
++            return address.isLoopbackAddress() || address.isSiteLocalAddress() || address.isLinkLocalAddress();
++        } catch (UnknownHostException e) {
++            return false;
++        }
++    }
++}
+diff --git a/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/enrich/ThreatIntelProvider.java b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/enrich/ThreatIntelProvider.java
+new file mode 100644
+index 0000000..969d580
+--- /dev/null
++++ b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/enrich/ThreatIntelProvider.java
+@@ -0,0 +1,11 @@
++package com.gattopiccolo.ledger.threat.enrich;
++
++/**
++ * Source of IP reputation. A production implementation would call a feed such
++ * as AbuseIPDB or an internal TI platform (with caching and timeouts); the
++ * prototype ships a static, configuration-driven one.
++ */
++public interface ThreatIntelProvider {
++
++    IpReputation lookup(String ip);
++}
+diff --git a/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/rule/AccountEnumerationRule.java b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/rule/AccountEnumerationRule.java
+new file mode 100644
+index 0000000..fa2b69f
+--- /dev/null
++++ b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/rule/AccountEnumerationRule.java
+@@ -0,0 +1,70 @@
++package com.gattopiccolo.ledger.threat.rule;
++
++import com.gattopiccolo.ledger.threat.EventType;
++import com.gattopiccolo.ledger.threat.EventWindow;
++import com.gattopiccolo.ledger.threat.SecurityEvent;
++import com.gattopiccolo.ledger.threat.Severity;
++
++import java.time.Duration;
++import java.time.Instant;
++import java.util.Optional;
++import java.util.Set;
++import java.util.TreeSet;
++import java.util.stream.Collectors;
++
++/**
++ * Sequential account-id guessing: one actor probes many account ids that are
++ * either foreign or non-existent within a short time.
++ */
++public final class AccountEnumerationRule implements DetectionRule {
++
++    public static final String ID = "LEDGER-002";
++
++    private final Duration windowSize;
++    private final int threshold;
++
++    public AccountEnumerationRule(Duration windowSize, int threshold) {
++        this.windowSize = windowSize;
++        this.threshold = threshold;
++    }
++
++    @Override
++    public String id() {
++        return ID;
++    }
++
++    @Override
++    public Optional<Detection> evaluate(SecurityEvent latest, EventWindow window) {
++        if (!isProbe(latest)) {
++            return Optional.empty();
++        }
++        Instant from = latest.at().minus(windowSize);
++        Set<Long> probed = window.byActorSince(latest.actor(), from).stream()
++                .filter(AccountEnumerationRule::isProbe)
++                .map(SecurityEvent::accountId)
++                .collect(Collectors.toCollection(TreeSet::new));
++        if (probed.size() < threshold) {
++            return Optional.empty();
++        }
++        Severity severity = probed.size() >= threshold * 2 ? Severity.CRITICAL : Severity.HIGH;
++        String evidence = String.format("user %s probed %d distinct account ids within %ds: %s",
++                latest.actor(), probed.size(), windowSize.toSeconds(), probed);
++        return Optional.of(new Detection(
++                ID,
++                "Account enumeration",
++                severity,
++                "A01:2025 Broken Access Control",
++                "Discovery (TA0007)",
++                "T1087 Account Discovery",
++                latest.actor(),
++                latest.sourceIp(),
++                latest.accountId(),
++                evidence,
++                latest.at()));
++    }
++
++    private static boolean isProbe(SecurityEvent e) {
++        return e.accountId() != null
++                && (e.type() == EventType.FOREIGN_ACCOUNT_ACCESS || e.status() == 404);
++    }
++}
+diff --git a/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/rule/ClientErrorProbingRule.java b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/rule/ClientErrorProbingRule.java
+new file mode 100644
+index 0000000..b858200
+--- /dev/null
++++ b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/rule/ClientErrorProbingRule.java
+@@ -0,0 +1,58 @@
++package com.gattopiccolo.ledger.threat.rule;
++
++import com.gattopiccolo.ledger.threat.EventWindow;
++import com.gattopiccolo.ledger.threat.SecurityEvent;
++import com.gattopiccolo.ledger.threat.Severity;
++
++import java.time.Duration;
++import java.util.Optional;
++
++/**
++ * Many 4xx responses for one actor in a short time: fuzzing, scanning or a
++ * broken client. Deliberately low severity; it is context, not an alarm.
++ */
++public final class ClientErrorProbingRule implements DetectionRule {
++
++    public static final String ID = "LEDGER-004";
++
++    private final Duration windowSize;
++    private final int threshold;
++
++    public ClientErrorProbingRule(Duration windowSize, int threshold) {
++        this.windowSize = windowSize;
++        this.threshold = threshold;
++    }
++
++    @Override
++    public String id() {
++        return ID;
++    }
++
++    @Override
++    public Optional<Detection> evaluate(SecurityEvent latest, EventWindow window) {
++        if (!latest.isClientError()) {
++            return Optional.empty();
++        }
++        long count = window.byActorSince(latest.actor(), latest.at().minus(windowSize)).stream()
++                .filter(SecurityEvent::isClientError)
++                .count();
++        if (count < threshold) {
++            return Optional.empty();
++        }
++        Severity severity = count >= threshold * 2L ? Severity.MEDIUM : Severity.LOW;
++        String evidence = String.format("%d client errors (4xx) for user %s within %ds (threshold %d)",
++                count, latest.actor(), windowSize.toSeconds(), threshold);
++        return Optional.of(new Detection(
++                ID,
++                "Repeated client errors (possible probing)",
++                severity,
++                "A06:2025 Insecure Design (no rate limiting)",
++                "Reconnaissance (TA0043)",
++                "T1595 Active Scanning",
++                latest.actor(),
++                latest.sourceIp(),
++                latest.accountId(),
++                evidence,
++                latest.at()));
++    }
++}
+diff --git a/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/rule/DebitVelocityRule.java b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/rule/DebitVelocityRule.java
+new file mode 100644
+index 0000000..d29d9e4
+--- /dev/null
++++ b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/rule/DebitVelocityRule.java
+@@ -0,0 +1,63 @@
++package com.gattopiccolo.ledger.threat.rule;
++
++import com.gattopiccolo.ledger.threat.EventType;
++import com.gattopiccolo.ledger.threat.EventWindow;
++import com.gattopiccolo.ledger.threat.SecurityEvent;
++import com.gattopiccolo.ledger.threat.Severity;
++
++import java.time.Duration;
++import java.util.Optional;
++
++/**
++ * Burst of successful debits from one actor: a typical shape of money drain
++ * after account takeover, or of an automated abuse of a missing rate limit.
++ */
++public final class DebitVelocityRule implements DetectionRule {
++
++    public static final String ID = "LEDGER-003";
++
++    private final Duration windowSize;
++    private final int threshold;
++
++    public DebitVelocityRule(Duration windowSize, int threshold) {
++        this.windowSize = windowSize;
++        this.threshold = threshold;
++    }
++
++    @Override
++    public String id() {
++        return ID;
++    }
++
++    @Override
++    public Optional<Detection> evaluate(SecurityEvent latest, EventWindow window) {
++        if (!isSuccessfulDebit(latest)) {
++            return Optional.empty();
++        }
++        long count = window.byActorSince(latest.actor(), latest.at().minus(windowSize)).stream()
++                .filter(DebitVelocityRule::isSuccessfulDebit)
++                .count();
++        if (count < threshold) {
++            return Optional.empty();
++        }
++        Severity severity = count >= threshold * 2L ? Severity.HIGH : Severity.MEDIUM;
++        String evidence = String.format("%d successful debits by user %s within %ds (threshold %d)",
++                count, latest.actor(), windowSize.toSeconds(), threshold);
++        return Optional.of(new Detection(
++                ID,
++                "Unusual debit velocity",
++                severity,
++                "A06:2025 Insecure Design (no rate limiting)",
++                "Impact (TA0040)",
++                "T1657 Financial Theft",
++                latest.actor(),
++                latest.sourceIp(),
++                latest.accountId(),
++                evidence,
++                latest.at()));
++    }
++
++    private static boolean isSuccessfulDebit(SecurityEvent e) {
++        return e.type() == EventType.DEBIT && e.isSuccess();
++    }
++}
+diff --git a/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/rule/Detection.java b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/rule/Detection.java
+new file mode 100644
+index 0000000..3e211f0
+--- /dev/null
++++ b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/rule/Detection.java
+@@ -0,0 +1,31 @@
++package com.gattopiccolo.ledger.threat.rule;
++
++import com.gattopiccolo.ledger.threat.Severity;
++
++import java.time.Instant;
++
++/**
++ * Raw output of a {@link DetectionRule}: one signal that something suspicious
++ * happened. Many detections can collapse into a single finding (see the
++ * fingerprint), which is how the prototype fights alert fatigue.
++ */
++public record Detection(String ruleId,
++                        String title,
++                        Severity severity,
++                        String owaspCategory,
++                        String attackTactic,
++                        String attackTechnique,
++                        String actor,
++                        String sourceIp,
++                        Long affectedAccountId,
++                        String evidence,
++                        Instant at) {
++
++    /**
++     * Deduplication key: the same rule firing for the same actor from the same
++     * address is the same story, however many times it repeats.
++     */
++    public String fingerprint() {
++        return ruleId + ":" + actor + ":" + (sourceIp == null ? "-" : sourceIp);
++    }
++}
+diff --git a/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/rule/DetectionRule.java b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/rule/DetectionRule.java
+new file mode 100644
+index 0000000..72a8561
+--- /dev/null
++++ b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/rule/DetectionRule.java
+@@ -0,0 +1,17 @@
++package com.gattopiccolo.ledger.threat.rule;
++
++import com.gattopiccolo.ledger.threat.EventWindow;
++import com.gattopiccolo.ledger.threat.SecurityEvent;
++
++import java.util.Optional;
++
++/**
++ * A detection use case. Rules are evaluated for every incoming event, after the
++ * event has been added to the window. They must be cheap and side-effect free.
++ */
++public interface DetectionRule {
++
++    String id();
++
++    Optional<Detection> evaluate(SecurityEvent latest, EventWindow window);
++}
+diff --git a/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/rule/ForeignAccountAccessRule.java b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/rule/ForeignAccountAccessRule.java
+new file mode 100644
+index 0000000..f78b331
+--- /dev/null
++++ b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/rule/ForeignAccountAccessRule.java
+@@ -0,0 +1,55 @@
++package com.gattopiccolo.ledger.threat.rule;
++
++import com.gattopiccolo.ledger.threat.EventType;
++import com.gattopiccolo.ledger.threat.EventWindow;
++import com.gattopiccolo.ledger.threat.SecurityEvent;
++import com.gattopiccolo.ledger.threat.Severity;
++
++import java.util.Optional;
++
++/**
++ * Broken object level authorization (BOLA / IDOR): a caller addressed an
++ * account that belongs to somebody else.
++ *
++ * <p>Severity follows impact: a successful state-changing call is critical, a
++ * successful read exposes data, anything else is an attempt.
++ */
++public final class ForeignAccountAccessRule implements DetectionRule {
++
++    public static final String ID = "LEDGER-001";
++
++    @Override
++    public String id() {
++        return ID;
++    }
++
++    @Override
++    public Optional<Detection> evaluate(SecurityEvent latest, EventWindow window) {
++        if (latest.type() != EventType.FOREIGN_ACCOUNT_ACCESS) {
++            return Optional.empty();
++        }
++        Severity severity;
++        if (!latest.isSuccess()) {
++            severity = Severity.MEDIUM;
++        } else if (latest.isMutation()) {
++            severity = Severity.CRITICAL;
++        } else {
++            severity = Severity.HIGH;
++        }
++        String evidence = String.format("user %s %s %s on account %s owned by user %s -> HTTP %d",
++                latest.actor(), latest.method(), latest.path(),
++                latest.accountId(), latest.ownerUserId(), latest.status());
++        return Optional.of(new Detection(
++                ID,
++                "Access to another user's account (BOLA)",
++                severity,
++                "A01:2025 Broken Access Control",
++                "Initial Access (TA0001)",
++                "T1190 Exploit Public-Facing Application",
++                latest.actor(),
++                latest.sourceIp(),
++                latest.accountId(),
++                evidence,
++                latest.at()));
++    }
++}
+diff --git a/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/vuln/PrioritizedVulnerability.java b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/vuln/PrioritizedVulnerability.java
+new file mode 100644
+index 0000000..62afb87
+--- /dev/null
++++ b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/vuln/PrioritizedVulnerability.java
+@@ -0,0 +1,8 @@
++package com.gattopiccolo.ledger.threat.vuln;
++
++/** A vulnerability with its computed priority and a plain-language explanation. */
++public record PrioritizedVulnerability(VulnerabilityFinding finding,
++                                       int priorityScore,
++                                       String tier,
++                                       String rationale) {
++}
+diff --git a/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/vuln/SampleVulnerabilityCatalog.java b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/vuln/SampleVulnerabilityCatalog.java
+new file mode 100644
+index 0000000..3c17d06
+--- /dev/null
++++ b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/vuln/SampleVulnerabilityCatalog.java
+@@ -0,0 +1,24 @@
++package com.gattopiccolo.ledger.threat.vuln;
++
++import java.util.List;
++
++/**
++ * SAMPLE DATA ONLY. The identifiers use the reserved-looking year 2099 and the
++ * components are fictional; none of this describes a real vulnerability. In a
++ * real system this list would come from an SCA scanner or an advisory feed
++ * (for example OSV), joined with runtime data about what is actually loaded.
++ */
++public final class SampleVulnerabilityCatalog {
++
++    private SampleVulnerabilityCatalog() {
++    }
++
++    public static List<VulnerabilityFinding> findings() {
++        return List.of(
++                new VulnerabilityFinding("CVE-2099-0001", "sample-http-client", "1.4.2", 9.8, 0.92, true, true, true),
++                new VulnerabilityFinding("CVE-2099-0002", "sample-xml-parser", "2.1.0", 9.8, 0.04, false, false, true),
++                new VulnerabilityFinding("CVE-2099-0003", "sample-template-engine", "3.0.1", 7.5, 0.31, false, true, true),
++                new VulnerabilityFinding("CVE-2099-0004", "sample-logging-lib", "5.2.0", 5.3, 0.01, false, true, false),
++                new VulnerabilityFinding("CVE-2099-0005", "sample-test-utils", "0.9.8", 8.1, 0.02, false, false, false));
++    }
++}
+diff --git a/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/vuln/VulnerabilityFinding.java b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/vuln/VulnerabilityFinding.java
+new file mode 100644
+index 0000000..af531eb
+--- /dev/null
++++ b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/vuln/VulnerabilityFinding.java
+@@ -0,0 +1,20 @@
++package com.gattopiccolo.ledger.threat.vuln;
++
++/**
++ * A known vulnerability in a dependency, with the signals used to prioritise it.
++ *
++ * @param cvss            CVSS base score 0..10 (severity in theory)
++ * @param epss            EPSS probability 0..1 of exploitation in the next 30 days
++ * @param knownExploited  listed in an "actively exploited" catalogue such as CISA KEV
++ * @param loadedAtRuntime the vulnerable library is actually loaded by a running process
++ * @param internetExposed the affected service is reachable from the internet
++ */
++public record VulnerabilityFinding(String cveId,
++                                   String component,
++                                   String version,
++                                   double cvss,
++                                   double epss,
++                                   boolean knownExploited,
++                                   boolean loadedAtRuntime,
++                                   boolean internetExposed) {
++}
+diff --git a/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/vuln/VulnerabilityPrioritizer.java b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/vuln/VulnerabilityPrioritizer.java
+new file mode 100644
+index 0000000..4cfd275
+--- /dev/null
++++ b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/vuln/VulnerabilityPrioritizer.java
+@@ -0,0 +1,63 @@
++package com.gattopiccolo.ledger.threat.vuln;
++
++import java.util.Comparator;
++import java.util.List;
++
++/**
++ * Ranks vulnerabilities by real-world risk rather than by CVSS alone.
++ *
++ * <pre>
++ * score = cvss/10 x 40  +  epss x 30  +  20 if known-exploited  +  10 if internet-exposed
++ * score x= 0.4 when the library is not loaded at runtime
++ * </pre>
++ *
++ * Tiers: P1 &gt;= 70 (fix now), P2 &gt;= 45, P3 &gt;= 25, otherwise P4. A teaching
++ * heuristic that demonstrates "prioritisation with runtime context", not an
++ * official formula.
++ */
++public final class VulnerabilityPrioritizer {
++
++    private static final double NOT_LOADED_FACTOR = 0.4;
++
++    public PrioritizedVulnerability prioritize(VulnerabilityFinding v) {
++        double score = v.cvss() / 10.0 * 40.0 + v.epss() * 30.0;
++        StringBuilder why = new StringBuilder();
++        why.append(String.format("CVSS %.1f, EPSS %.0f%%", v.cvss(), v.epss() * 100));
++        if (v.knownExploited()) {
++            score += 20;
++            why.append(", known exploited");
++        }
++        if (v.internetExposed()) {
++            score += 10;
++            why.append(", internet-exposed");
++        }
++        if (!v.loadedAtRuntime()) {
++            score *= NOT_LOADED_FACTOR;
++            why.append(", not loaded at runtime (deprioritised)");
++        } else {
++            why.append(", loaded at runtime");
++        }
++        int rounded = (int) Math.max(0, Math.min(100, Math.round(score)));
++        return new PrioritizedVulnerability(v, rounded, tier(rounded), why.toString());
++    }
++
++    public List<PrioritizedVulnerability> rank(List<VulnerabilityFinding> findings) {
++        return findings.stream()
++                .map(this::prioritize)
++                .sorted(Comparator.comparingInt(PrioritizedVulnerability::priorityScore).reversed())
++                .toList();
++    }
++
++    static String tier(int score) {
++        if (score >= 70) {
++            return "P1 - fix now";
++        }
++        if (score >= 45) {
++            return "P2 - this sprint";
++        }
++        if (score >= 25) {
++            return "P3 - backlog";
++        }
++        return "P4 - monitor";
++    }
++}
+diff --git a/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/web/ThreatController.java b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/web/ThreatController.java
+new file mode 100644
+index 0000000..8581801
+--- /dev/null
++++ b/ledger-api/src/main/java/com/gattopiccolo/ledger/threat/web/ThreatController.java
+@@ -0,0 +1,109 @@
++package com.gattopiccolo.ledger.threat.web;
++
++import com.gattopiccolo.ledger.threat.DetectionEngine;
++import com.gattopiccolo.ledger.threat.Finding;
++import com.gattopiccolo.ledger.threat.FindingService;
++import com.gattopiccolo.ledger.threat.FindingStatus;
++import com.gattopiccolo.ledger.threat.SecurityEvent;
++import com.gattopiccolo.ledger.threat.Severity;
++import com.gattopiccolo.ledger.threat.vuln.PrioritizedVulnerability;
++import com.gattopiccolo.ledger.threat.vuln.SampleVulnerabilityCatalog;
++import com.gattopiccolo.ledger.threat.vuln.VulnerabilityPrioritizer;
++import org.springframework.web.bind.annotation.GetMapping;
++import org.springframework.web.bind.annotation.PathVariable;
++import org.springframework.web.bind.annotation.PostMapping;
++import org.springframework.web.bind.annotation.RequestBody;
++import org.springframework.web.bind.annotation.RequestMapping;
++import org.springframework.web.bind.annotation.RequestParam;
++import org.springframework.web.bind.annotation.RestController;
++
++import java.time.Instant;
++import java.util.List;
++
++/**
++ * Read-mostly API behind the Security page. Effective paths are prefixed with
++ * {@code /api} by {@link com.gattopiccolo.ledger.config.WebMvcConfig}.
++ *
++ * <p>Like the rest of this prototype it has no real authentication; do not
++ * expose it outside a trusted network.
++ */
++@RestController
++@RequestMapping("/security")
++public class ThreatController {
++
++    private static final int MAX_EVENTS = 200;
++
++    private final FindingService findings;
++    private final DetectionEngine engine;
++    private final VulnerabilityPrioritizer prioritizer;
++
++    public ThreatController(FindingService findings,
++                            DetectionEngine engine,
++                            VulnerabilityPrioritizer prioritizer) {
++        this.findings = findings;
++        this.engine = engine;
++        this.prioritizer = prioritizer;
++    }
++
++    @GetMapping("/findings")
++    public List<FindingView> listFindings(@RequestParam(required = false) FindingStatus status,
++                                          @RequestParam(defaultValue = "0") int minScore) {
++        return findings.list(status, minScore).stream().map(FindingView::of).toList();
++    }
++
++    @GetMapping("/findings/{id}")
++    public FindingView getFinding(@PathVariable Long id) {
++        return FindingView.of(findings.get(id));
++    }
++
++    @PostMapping("/findings/{id}/status")
++    public FindingView updateStatus(@PathVariable Long id, @RequestBody StatusRequest body) {
++        return FindingView.of(findings.updateStatus(id, body.status()));
++    }
++
++    @GetMapping("/events")
++    public List<SecurityEvent> recentEvents(@RequestParam(defaultValue = "50") int limit,
++                                            @RequestParam(required = false) String actor) {
++        int bounded = Math.min(Math.max(limit, 1), MAX_EVENTS);
++        return engine.window().recent(bounded, actor);
++    }
++
++    @GetMapping("/summary")
++    public FindingService.Summary summary() {
++        return findings.summary(engine.window().total());
++    }
++
++    @GetMapping("/vulnerabilities")
++    public List<PrioritizedVulnerability> vulnerabilities() {
++        return prioritizer.rank(SampleVulnerabilityCatalog.findings());
++    }
++
++    public record StatusRequest(FindingStatus status) {
++    }
++
++    public record FindingView(Long id,
++                              String ruleId,
++                              String title,
++                              Severity severity,
++                              int riskScore,
++                              FindingStatus status,
++                              String owaspCategory,
++                              String attackTactic,
++                              String attackTechnique,
++                              String actor,
++                              String sourceIp,
++                              Long affectedAccountId,
++                              int occurrenceCount,
++                              Instant firstSeen,
++                              Instant lastSeen,
++                              String evidence,
++                              String intel) {
++
++        static FindingView of(Finding f) {
++            return new FindingView(f.getId(), f.getRuleId(), f.getTitle(), f.getSeverity(),
++                    f.getRiskScore(), f.getStatus(), f.getOwaspCategory(), f.getAttackTactic(),
++                    f.getAttackTechnique(), f.getActor(), f.getSourceIp(), f.getAffectedAccountId(),
++                    f.getOccurrenceCount(), f.getFirstSeen(), f.getLastSeen(), f.getEvidence(), f.getIntel());
++        }
++    }
++}
+diff --git a/ledger-api/src/main/resources/application.yml b/ledger-api/src/main/resources/application.yml
+index d11cce1..2c95a88 100644
+--- a/ledger-api/src/main/resources/application.yml
++++ b/ledger-api/src/main/resources/application.yml
+@@ -27,6 +27,18 @@ ledger:
+     path: /200
+     connect-timeout-ms: 2000
+     read-timeout-ms: 2000
++  # Threat-observability module (see docs/threat-observability.md). All values are optional.
++  security:
++    enabled: true
++    window: 5m
++    enumeration-threshold: 5
++    debit-velocity-threshold: 10
++    client-error-threshold: 10
++    suppression: 1h
++    trust-forwarded-for: false
++    # Static threat-intel feed (ip -> label). 203.0.113.0/24 is a documentation range.
++    malicious-ips:
++      "203.0.113.66": sample-threat-feed
+ 
+ ---
+ 
+diff --git a/ledger-api/src/main/resources/db/migration/V3__security_finding.sql b/ledger-api/src/main/resources/db/migration/V3__security_finding.sql
+new file mode 100644
+index 0000000..3526fbd
+--- /dev/null
++++ b/ledger-api/src/main/resources/db/migration/V3__security_finding.sql
+@@ -0,0 +1,25 @@
++-- Threat-observability findings (deduplicated, enriched, scored). Mirrors the Finding entity.
++create table security_finding (
++    id                 bigint generated by default as identity primary key,
++    fingerprint        varchar(200) not null,
++    rule_id            varchar(32)  not null,
++    title              varchar(200) not null,
++    severity           varchar(16)  not null,
++    risk_score         integer      not null,
++    status             varchar(16)  not null,
++    owasp_category     varchar(120),
++    attack_tactic      varchar(60),
++    attack_technique   varchar(120),
++    actor              varchar(64),
++    source_ip          varchar(64),
++    affected_account_id bigint,
++    occurrence_count   integer      not null,
++    first_seen         timestamp    not null,
++    last_seen          timestamp    not null,
++    evidence           varchar(1000),
++    intel              varchar(255)
++);
++-- Deduplication lookup: active finding with this fingerprint seen recently.
++create index idx_finding_fingerprint on security_finding (fingerprint, status, last_seen desc);
++-- Analyst view: highest risk first.
++create index idx_finding_risk on security_finding (risk_score desc, last_seen desc);
+diff --git a/ledger-api/src/test/java/com/gattopiccolo/ledger/threat/DetectionPipelineTest.java b/ledger-api/src/test/java/com/gattopiccolo/ledger/threat/DetectionPipelineTest.java
+new file mode 100644
+index 0000000..82f2b89
+--- /dev/null
++++ b/ledger-api/src/test/java/com/gattopiccolo/ledger/threat/DetectionPipelineTest.java
+@@ -0,0 +1,106 @@
++package com.gattopiccolo.ledger.threat;
++
++import com.gattopiccolo.ledger.domain.CurrencyCode;
++import com.gattopiccolo.ledger.service.AccountService;
++import com.gattopiccolo.ledger.service.ExternalLoggingClient;
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.test.context.bean.override.mockito.MockitoBean;
++
++import java.time.Instant;
++import java.util.List;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertTrue;
++
++/**
++ * End-to-end through the engine, correlation layer and database (without HTTP).
++ * Each test uses its own actor id so the shared Spring context stays isolated.
++ */
++@SpringBootTest
++class DetectionPipelineTest {
++
++    @Autowired
++    private DetectionEngine engine;
++
++    @Autowired
++    private FindingService findings;
++
++    @Autowired
++    private AccountService accounts;
++
++    // Never touch the real external endpoint.
++    @MockitoBean
++    private ExternalLoggingClient externalLoggingClient;
++
++    private SecurityEvent foreignRead(String actor, String ip, Long accountId, Long owner, Instant at) {
++        return new SecurityEvent(at, actor, ip, "GET", "/api/accounts/" + accountId + "/balance",
++                200, accountId, owner, EventType.FOREIGN_ACCOUNT_ACCESS);
++    }
++
++    private List<Finding> findingsOf(String actor) {
++        return findings.list(null, 0).stream().filter(f -> actor.equals(f.getActor())).toList();
++    }
++
++    @Test
++    void repeatedForeignAccessFoldsIntoOneFindingWithAnOccurrenceCount() {
++        Long victim = accounts.openAccount(9001L, CurrencyCode.EUR);
++        Instant t0 = Instant.now();
++
++        for (int i = 0; i < 5; i++) {
++            engine.onEvent(foreignRead("9002", "198.51.100.7", victim, 9001L, t0.plusSeconds(i)));
++        }
++
++        List<Finding> mine = findingsOf("9002").stream()
++                .filter(f -> "LEDGER-001".equals(f.getRuleId())).toList();
++        assertEquals(1, mine.size());
++        assertEquals(5, mine.get(0).getOccurrenceCount());
++        assertEquals(Severity.HIGH, mine.get(0).getSeverity());
++        assertEquals(FindingStatus.OPEN, mine.get(0).getStatus());
++    }
++
++    @Test
++    void knownMaliciousSourceScoresHigherThanAnUnknownOne() {
++        Long victim = accounts.openAccount(9003L, CurrencyCode.EUR);
++        Instant now = Instant.now();
++
++        engine.onEvent(foreignRead("9004", "198.51.100.8", victim, 9003L, now));
++        engine.onEvent(foreignRead("9005", "203.0.113.66", victim, 9003L, now));
++
++        int unknown = findingsOf("9004").get(0).getRiskScore();
++        Finding bad = findingsOf("9005").get(0);
++        assertTrue(bad.getRiskScore() > unknown);
++        assertTrue(bad.getIntel().startsWith("MALICIOUS"));
++    }
++
++    @Test
++    void resolvedFindingIsNotReusedForNewDetections() {
++        Long victim = accounts.openAccount(9006L, CurrencyCode.EUR);
++        Instant now = Instant.now();
++
++        engine.onEvent(foreignRead("9007", "198.51.100.9", victim, 9006L, now));
++        Finding first = findingsOf("9007").get(0);
++        findings.updateStatus(first.getId(), FindingStatus.RESOLVED);
++
++        engine.onEvent(foreignRead("9007", "198.51.100.9", victim, 9006L, now.plusSeconds(5)));
++
++        assertEquals(2, findingsOf("9007").stream()
++                .filter(f -> "LEDGER-001".equals(f.getRuleId())).count());
++    }
++
++    @Test
++    void summaryReportsNoiseReduction() {
++        Long victim = accounts.openAccount(9008L, CurrencyCode.EUR);
++        Instant now = Instant.now();
++        for (int i = 0; i < 20; i++) {
++            engine.onEvent(foreignRead("9009", "198.51.100.10", victim, 9008L, now.plusSeconds(i)));
++        }
++
++        FindingService.Summary summary = findings.summary(engine.window().total());
++
++        assertTrue(summary.rawEvents() >= 20);
++        assertTrue(summary.suppressedDuplicates() >= 19);
++        assertTrue(summary.noiseReductionPct() > 0.0);
++    }
++}
+diff --git a/ledger-api/src/test/java/com/gattopiccolo/ledger/threat/EventWindowTest.java b/ledger-api/src/test/java/com/gattopiccolo/ledger/threat/EventWindowTest.java
+new file mode 100644
+index 0000000..78a45a7
+--- /dev/null
++++ b/ledger-api/src/test/java/com/gattopiccolo/ledger/threat/EventWindowTest.java
+@@ -0,0 +1,50 @@
++package com.gattopiccolo.ledger.threat;
++
++import org.junit.jupiter.api.Test;
++
++import java.time.Instant;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++
++class EventWindowTest {
++
++    private static SecurityEvent event(int second, String actor) {
++        return new SecurityEvent(Instant.parse("2026-11-08T10:00:00Z").plusSeconds(second), actor,
++                null, "GET", "/api/accounts/1", 200, 1L, 1L, EventType.REQUEST);
++    }
++
++    @Test
++    void oldestEventIsDroppedWhenCapacityIsReached() {
++        var window = new EventWindow(2);
++        window.add(event(0, "a"));
++        window.add(event(1, "a"));
++        window.add(event(2, "a"));
++
++        assertEquals(2, window.recent(10, null).size());
++        assertEquals(3, window.total());
++        // newest first, and the oldest event (second 0) is the one that was evicted
++        assertEquals(Instant.parse("2026-11-08T10:00:02Z"), window.recent(10, null).get(0).at());
++        assertEquals(Instant.parse("2026-11-08T10:00:01Z"), window.recent(10, null).get(1).at());
++    }
++
++    @Test
++    void recentCanBeFilteredByActorAndLimited() {
++        var window = new EventWindow(10);
++        window.add(event(0, "a"));
++        window.add(event(1, "b"));
++        window.add(event(2, "a"));
++
++        assertEquals(2, window.recent(10, "a").size());
++        assertEquals(1, window.recent(1, null).size());
++    }
++
++    @Test
++    void byActorSinceExcludesEarlierEvents() {
++        var window = new EventWindow(10);
++        window.add(event(0, "a"));
++        window.add(event(100, "a"));
++
++        var from = Instant.parse("2026-11-08T10:00:00Z").plusSeconds(50);
++        assertEquals(1, window.byActorSince("a", from).size());
++    }
++}
+diff --git a/ledger-api/src/test/java/com/gattopiccolo/ledger/threat/RiskScorerTest.java b/ledger-api/src/test/java/com/gattopiccolo/ledger/threat/RiskScorerTest.java
+new file mode 100644
+index 0000000..c2da0af
+--- /dev/null
++++ b/ledger-api/src/test/java/com/gattopiccolo/ledger/threat/RiskScorerTest.java
+@@ -0,0 +1,38 @@
++package com.gattopiccolo.ledger.threat;
++
++import com.gattopiccolo.ledger.threat.enrich.IpReputation;
++import org.junit.jupiter.api.Test;
++
++import java.math.BigDecimal;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++
++class RiskScorerTest {
++
++    private static final IpReputation UNKNOWN = IpReputation.unknown("198.51.100.7");
++    private static final IpReputation MALICIOUS =
++            new IpReputation("203.0.113.66", IpReputation.Verdict.MALICIOUS, "sample-feed");
++
++    @Test
++    void baseScoreIsUsedWhenThereIsNoContext() {
++        assertEquals(60, RiskScorer.score(Severity.HIGH, 1.0, UNKNOWN));
++    }
++
++    @Test
++    void maliciousSourceRaisesScoreByHalf() {
++        assertEquals(90, RiskScorer.score(Severity.HIGH, 1.0, MALICIOUS));
++    }
++
++    @Test
++    void scoreIsCappedAtOneHundred() {
++        assertEquals(100, RiskScorer.score(Severity.CRITICAL, 1.5, MALICIOUS));
++    }
++
++    @Test
++    void assetMultiplierGrowsWithBalance() {
++        assertEquals(1.0, RiskScorer.assetMultiplier(new BigDecimal("999.99")));
++        assertEquals(1.2, RiskScorer.assetMultiplier(new BigDecimal("1000")));
++        assertEquals(1.5, RiskScorer.assetMultiplier(new BigDecimal("10000")));
++        assertEquals(1.0, RiskScorer.assetMultiplier(null));
++    }
++}
+diff --git a/ledger-api/src/test/java/com/gattopiccolo/ledger/threat/enrich/StaticThreatIntelProviderTest.java b/ledger-api/src/test/java/com/gattopiccolo/ledger/threat/enrich/StaticThreatIntelProviderTest.java
+new file mode 100644
+index 0000000..9875d9a
+--- /dev/null
++++ b/ledger-api/src/test/java/com/gattopiccolo/ledger/threat/enrich/StaticThreatIntelProviderTest.java
+@@ -0,0 +1,39 @@
++package com.gattopiccolo.ledger.threat.enrich;
++
++import org.junit.jupiter.api.Test;
++
++import java.util.Map;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++
++class StaticThreatIntelProviderTest {
++
++    private final ThreatIntelProvider intel =
++            new StaticThreatIntelProvider(Map.of("203.0.113.66", "sample-feed"));
++
++    @Test
++    void listedAddressIsMalicious() {
++        var rep = intel.lookup("203.0.113.66");
++        assertEquals(IpReputation.Verdict.MALICIOUS, rep.verdict());
++        assertEquals("MALICIOUS: sample-feed", rep.summary());
++    }
++
++    @Test
++    void privateAndLoopbackAddressesAreInternal() {
++        assertEquals(IpReputation.Verdict.INTERNAL, intel.lookup("127.0.0.1").verdict());
++        assertEquals(IpReputation.Verdict.INTERNAL, intel.lookup("10.1.2.3").verdict());
++        assertEquals(IpReputation.Verdict.INTERNAL, intel.lookup("192.168.0.9").verdict());
++    }
++
++    @Test
++    void publicUnlistedAddressIsUnknown() {
++        assertEquals(IpReputation.Verdict.UNKNOWN, intel.lookup("198.51.100.7").verdict());
++    }
++
++    @Test
++    void nullBlankAndHostnamesAreUnknownWithoutDnsLookup() {
++        assertEquals(IpReputation.Verdict.UNKNOWN, intel.lookup(null).verdict());
++        assertEquals(IpReputation.Verdict.UNKNOWN, intel.lookup(" ").verdict());
++        assertEquals(IpReputation.Verdict.UNKNOWN, intel.lookup("localhost").verdict());
++    }
++}
+diff --git a/ledger-api/src/test/java/com/gattopiccolo/ledger/threat/rule/DetectionRulesTest.java b/ledger-api/src/test/java/com/gattopiccolo/ledger/threat/rule/DetectionRulesTest.java
+new file mode 100644
+index 0000000..a6888c2
+--- /dev/null
++++ b/ledger-api/src/test/java/com/gattopiccolo/ledger/threat/rule/DetectionRulesTest.java
+@@ -0,0 +1,179 @@
++package com.gattopiccolo.ledger.threat.rule;
++
++import com.gattopiccolo.ledger.threat.EventType;
++import com.gattopiccolo.ledger.threat.EventWindow;
++import com.gattopiccolo.ledger.threat.SecurityEvent;
++import com.gattopiccolo.ledger.threat.Severity;
++import org.junit.jupiter.api.Test;
++
++import java.time.Duration;
++import java.time.Instant;
++import java.util.Optional;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertFalse;
++import static org.junit.jupiter.api.Assertions.assertTrue;
++
++class DetectionRulesTest {
++
++    private static final Instant T0 = Instant.parse("2026-11-08T10:00:00Z");
++    private static final Duration FIVE_MIN = Duration.ofMinutes(5);
++
++    private static SecurityEvent event(int secondsFromStart, String actor, String method, int status,
++                                       Long accountId, Long owner, EventType type) {
++        return new SecurityEvent(T0.plusSeconds(secondsFromStart), actor, "198.51.100.7", method,
++                "/api/accounts/" + accountId, status, accountId, owner, type);
++    }
++
++    private static Optional<Detection> feed(DetectionRule rule, EventWindow window, SecurityEvent e) {
++        window.add(e);
++        return rule.evaluate(e, window);
++    }
++
++    // ----- LEDGER-001 foreign account access -----------------------------
++
++    @Test
++    void foreignReadThatSucceedsIsHigh() {
++        var rule = new ForeignAccountAccessRule();
++        var d = feed(rule, new EventWindow(100),
++                event(0, "7", "GET", 200, 1L, 1L, EventType.FOREIGN_ACCOUNT_ACCESS));
++
++        assertTrue(d.isPresent());
++        assertEquals(Severity.HIGH, d.get().severity());
++        assertEquals("A01:2025 Broken Access Control", d.get().owaspCategory());
++        assertTrue(d.get().attackTechnique().startsWith("T1190"));
++    }
++
++    @Test
++    void foreignMutationThatSucceedsIsCritical() {
++        var rule = new ForeignAccountAccessRule();
++        var d = feed(rule, new EventWindow(100),
++                event(0, "7", "POST", 200, 1L, 1L, EventType.FOREIGN_ACCOUNT_ACCESS));
++
++        assertEquals(Severity.CRITICAL, d.orElseThrow().severity());
++    }
++
++    @Test
++    void foreignAccessThatWasRejectedIsMedium() {
++        var rule = new ForeignAccountAccessRule();
++        var d = feed(rule, new EventWindow(100),
++                event(0, "7", "GET", 403, 1L, 1L, EventType.FOREIGN_ACCOUNT_ACCESS));
++
++        assertEquals(Severity.MEDIUM, d.orElseThrow().severity());
++    }
++
++    @Test
++    void ownAccountAccessIsIgnored() {
++        var rule = new ForeignAccountAccessRule();
++        var d = feed(rule, new EventWindow(100),
++                event(0, "1", "GET", 200, 1L, 1L, EventType.REQUEST));
++
++        assertFalse(d.isPresent());
++    }
++
++    @Test
++    void fingerprintIsStablePerRuleActorAndIp() {
++        var rule = new ForeignAccountAccessRule();
++        var window = new EventWindow(100);
++        var first = feed(rule, window, event(0, "7", "GET", 200, 1L, 1L, EventType.FOREIGN_ACCOUNT_ACCESS));
++        var second = feed(rule, window, event(10, "7", "GET", 200, 2L, 1L, EventType.FOREIGN_ACCOUNT_ACCESS));
++
++        assertEquals(first.orElseThrow().fingerprint(), second.orElseThrow().fingerprint());
++    }
++
++    // ----- LEDGER-002 enumeration ----------------------------------------
++
++    @Test
++    void enumerationFiresOnlyAtThreshold() {
++        var rule = new AccountEnumerationRule(FIVE_MIN, 3);
++        var window = new EventWindow(100);
++
++        assertFalse(feed(rule, window, event(0, "7", "GET", 200, 1L, 1L, EventType.FOREIGN_ACCOUNT_ACCESS)).isPresent());
++        assertFalse(feed(rule, window, event(1, "7", "GET", 404, 2L, null, EventType.CLIENT_ERROR)).isPresent());
++        var d = feed(rule, window, event(2, "7", "GET", 200, 3L, 1L, EventType.FOREIGN_ACCOUNT_ACCESS));
++
++        assertTrue(d.isPresent());
++        assertEquals(Severity.HIGH, d.get().severity());
++        assertTrue(d.get().evidence().contains("3 distinct account ids"));
++    }
++
++    @Test
++    void enumerationEscalatesToCriticalAtDoubleThreshold() {
++        var rule = new AccountEnumerationRule(FIVE_MIN, 2);
++        var window = new EventWindow(100);
++        Optional<Detection> last = Optional.empty();
++        for (long id = 1; id <= 4; id++) {
++            last = feed(rule, window, event((int) id, "7", "GET", 404, id, null, EventType.CLIENT_ERROR));
++        }
++        assertEquals(Severity.CRITICAL, last.orElseThrow().severity());
++    }
++
++    @Test
++    void enumerationIgnoresProbesOutsideTheWindow() {
++        var rule = new AccountEnumerationRule(FIVE_MIN, 2);
++        var window = new EventWindow(100);
++        feed(rule, window, event(0, "7", "GET", 404, 1L, null, EventType.CLIENT_ERROR));
++        var d = feed(rule, window, event(600, "7", "GET", 404, 2L, null, EventType.CLIENT_ERROR));
++
++        assertFalse(d.isPresent());
++    }
++
++    @Test
++    void enumerationIsPerActor() {
++        var rule = new AccountEnumerationRule(FIVE_MIN, 2);
++        var window = new EventWindow(100);
++        feed(rule, window, event(0, "7", "GET", 404, 1L, null, EventType.CLIENT_ERROR));
++        var d = feed(rule, window, event(1, "8", "GET", 404, 2L, null, EventType.CLIENT_ERROR));
++
++        assertFalse(d.isPresent());
++    }
++
++    // ----- LEDGER-003 debit velocity -------------------------------------
++
++    @Test
++    void debitVelocityFiresAtThresholdAndEscalates() {
++        var rule = new DebitVelocityRule(FIVE_MIN, 3);
++        var window = new EventWindow(100);
++        Optional<Detection> d = Optional.empty();
++        for (int i = 0; i < 3; i++) {
++            d = feed(rule, window, event(i, "5", "POST", 200, 9L, 5L, EventType.DEBIT));
++        }
++        assertEquals(Severity.MEDIUM, d.orElseThrow().severity());
++
++        for (int i = 3; i < 6; i++) {
++            d = feed(rule, window, event(i, "5", "POST", 200, 9L, 5L, EventType.DEBIT));
++        }
++        assertEquals(Severity.HIGH, d.orElseThrow().severity());
++    }
++
++    @Test
++    void failedDebitsDoNotCountTowardsVelocity() {
++        var rule = new DebitVelocityRule(FIVE_MIN, 2);
++        var window = new EventWindow(100);
++        feed(rule, window, event(0, "5", "POST", 422, 9L, 5L, EventType.DEBIT));
++        var d = feed(rule, window, event(1, "5", "POST", 422, 9L, 5L, EventType.DEBIT));
++
++        assertFalse(d.isPresent());
++    }
++
++    // ----- LEDGER-004 client error probing -------------------------------
++
++    @Test
++    void clientErrorsAreLowSeverityContext() {
++        var rule = new ClientErrorProbingRule(FIVE_MIN, 3);
++        var window = new EventWindow(100);
++        Optional<Detection> d = Optional.empty();
++        for (int i = 0; i < 3; i++) {
++            d = feed(rule, window, event(i, "7", "GET", 422, 1L, 7L, EventType.CLIENT_ERROR));
++        }
++        assertEquals(Severity.LOW, d.orElseThrow().severity());
++    }
++
++    @Test
++    void successfulRequestNeverTriggersClientErrorRule() {
++        var rule = new ClientErrorProbingRule(FIVE_MIN, 1);
++        var d = feed(rule, new EventWindow(100), event(0, "7", "GET", 200, 1L, 7L, EventType.REQUEST));
++
++        assertFalse(d.isPresent());
++    }
++}
+diff --git a/ledger-api/src/test/java/com/gattopiccolo/ledger/threat/vuln/VulnerabilityPrioritizerTest.java b/ledger-api/src/test/java/com/gattopiccolo/ledger/threat/vuln/VulnerabilityPrioritizerTest.java
+new file mode 100644
+index 0000000..78c331c
+--- /dev/null
++++ b/ledger-api/src/test/java/com/gattopiccolo/ledger/threat/vuln/VulnerabilityPrioritizerTest.java
+@@ -0,0 +1,58 @@
++package com.gattopiccolo.ledger.threat.vuln;
++
++import org.junit.jupiter.api.Test;
++
++import java.util.List;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertTrue;
++
++class VulnerabilityPrioritizerTest {
++
++    private final VulnerabilityPrioritizer prioritizer = new VulnerabilityPrioritizer();
++
++    @Test
++    void exploitedReachableExposedFlawIsP1() {
++        var v = new VulnerabilityFinding("CVE-2099-0001", "lib", "1", 9.8, 0.92, true, true, true);
++        var p = prioritizer.prioritize(v);
++
++        assertEquals(97, p.priorityScore()); // 39.2 + 27.6 + 20 + 10 = 96.8
++        assertTrue(p.tier().startsWith("P1"));
++    }
++
++    @Test
++    void sameCvssIsDeprioritisedWhenNotLoadedAndNotExploited() {
++        var loaded = new VulnerabilityFinding("A", "lib", "1", 9.8, 0.04, false, true, true);
++        var dormant = new VulnerabilityFinding("B", "lib", "1", 9.8, 0.04, false, false, true);
++
++        assertTrue(prioritizer.prioritize(loaded).priorityScore()
++                > prioritizer.prioritize(dormant).priorityScore());
++        assertTrue(prioritizer.prioritize(dormant).rationale().contains("not loaded at runtime"));
++    }
++
++    @Test
++    void rankPutsHighestRiskFirstAndIgnoresRawCvssOrder() {
++        var highCvssDormant = new VulnerabilityFinding("HIGH-CVSS", "lib", "1", 9.8, 0.02, false, false, false);
++        var lowerCvssExploited = new VulnerabilityFinding("EXPLOITED", "lib", "1", 7.0, 0.7, true, true, true);
++
++        var ranked = prioritizer.rank(List.of(highCvssDormant, lowerCvssExploited));
++
++        assertEquals("EXPLOITED", ranked.get(0).finding().cveId());
++    }
++
++    @Test
++    void sampleCatalogIsRankedWithTheExploitedItemOnTop() {
++        var ranked = prioritizer.rank(SampleVulnerabilityCatalog.findings());
++
++        assertEquals(5, ranked.size());
++        assertEquals("CVE-2099-0001", ranked.get(0).finding().cveId());
++    }
++
++    @Test
++    void tierBoundaries() {
++        assertEquals("P1 - fix now", VulnerabilityPrioritizer.tier(70));
++        assertEquals("P2 - this sprint", VulnerabilityPrioritizer.tier(69));
++        assertEquals("P3 - backlog", VulnerabilityPrioritizer.tier(25));
++        assertEquals("P4 - monitor", VulnerabilityPrioritizer.tier(24));
++    }
++}
+diff --git a/ledger-api/src/test/resources/application.yml b/ledger-api/src/test/resources/application.yml
+index d350d42..6cc907f 100644
+--- a/ledger-api/src/test/resources/application.yml
++++ b/ledger-api/src/test/resources/application.yml
+@@ -19,6 +19,9 @@ ledger:
+   external-logging:
+     base-url: http://localhost:0
+     path: /200
++  security:
++    malicious-ips:
++      "203.0.113.66": sample-threat-feed
+ 
+ ---
+ 
+diff --git a/ledger-web/src/app/accounts/accounts-page/accounts-page.html b/ledger-web/src/app/accounts/accounts-page/accounts-page.html
+index 3c3db43..4bf074d 100644
+--- a/ledger-web/src/app/accounts/accounts-page/accounts-page.html
++++ b/ledger-web/src/app/accounts/accounts-page/accounts-page.html
+@@ -4,6 +4,7 @@
+       <p class="hero__eyebrow">Ledger workspace</p>
+       <h1 class="hero__title">Accounts</h1>
+       <p class="hero__copy">Create customer accounts, inspect balances, and move into transaction history.</p>
++      <p class="hero__copy"><a routerLink="/security">Security findings →</a></p>
+     </div>
+     <div class="hero__meta">
+       <div class="metric">
+diff --git a/ledger-web/src/app/accounts/accounts-page/accounts-page.spec.ts b/ledger-web/src/app/accounts/accounts-page/accounts-page.spec.ts
+index 5d2d941..77bd398 100644
+--- a/ledger-web/src/app/accounts/accounts-page/accounts-page.spec.ts
++++ b/ledger-web/src/app/accounts/accounts-page/accounts-page.spec.ts
+@@ -1,4 +1,5 @@
+ import { ComponentFixture, TestBed } from '@angular/core/testing';
++import { provideRouter } from '@angular/router';
+ 
+ import { AccountsPage } from './accounts-page';
+ 
+@@ -9,6 +10,7 @@ describe('AccountsPage', () => {
+   beforeEach(async () => {
+     await TestBed.configureTestingModule({
+       imports: [AccountsPage],
++      providers: [provideRouter([])],
+     }).compileComponents();
+ 
+     fixture = TestBed.createComponent(AccountsPage);
+diff --git a/ledger-web/src/app/app.routes.ts b/ledger-web/src/app/app.routes.ts
+index 29382f8..7ffe904 100644
+--- a/ledger-web/src/app/app.routes.ts
++++ b/ledger-web/src/app/app.routes.ts
+@@ -26,5 +26,11 @@ export const routes: Routes = [
+       import('./accounts/account-overview/account-overview-page/account-overview-page')
+         .then(m => m.AccountOverviewPage),
+   },
++  {
++    path: 'security',
++    title: 'Security',
++    loadComponent: () =>
++      import('./security/security-page/security-page').then(m => m.SecurityPage),
++  },
+   { path: '**', redirectTo: 'accounts' },
+ ];
+diff --git a/ledger-web/src/app/core/api/security-api.ts b/ledger-web/src/app/core/api/security-api.ts
+new file mode 100644
+index 0000000..3b7fa79
+--- /dev/null
++++ b/ledger-web/src/app/core/api/security-api.ts
+@@ -0,0 +1,31 @@
++import { HttpClient } from '@angular/common/http';
++import { inject, Injectable } from '@angular/core';
++import { Observable } from 'rxjs';
++import {
++  Finding,
++  FindingStatus,
++  PrioritizedVulnerability,
++  SecuritySummary,
++} from '../models/security';
++
++@Injectable({ providedIn: 'root' })
++export class SecurityApi {
++  private readonly http = inject(HttpClient);
++  private readonly base = '/api/security';
++
++  listFindings(): Observable<Finding[]> {
++    return this.http.get<Finding[]>(`${this.base}/findings`);
++  }
++
++  updateStatus(id: number, status: FindingStatus): Observable<Finding> {
++    return this.http.post<Finding>(`${this.base}/findings/${id}/status`, { status });
++  }
++
++  summary(): Observable<SecuritySummary> {
++    return this.http.get<SecuritySummary>(`${this.base}/summary`);
++  }
++
++  vulnerabilities(): Observable<PrioritizedVulnerability[]> {
++    return this.http.get<PrioritizedVulnerability[]>(`${this.base}/vulnerabilities`);
++  }
++}
+diff --git a/ledger-web/src/app/core/models/security.ts b/ledger-web/src/app/core/models/security.ts
+new file mode 100644
+index 0000000..a02aac1
+--- /dev/null
++++ b/ledger-web/src/app/core/models/security.ts
+@@ -0,0 +1,51 @@
++export type Severity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
++export type FindingStatus = 'OPEN' | 'ACKNOWLEDGED' | 'RESOLVED';
++
++/** A deduplicated, enriched and scored security finding. */
++export interface Finding {
++  id: number;
++  ruleId: string;
++  title: string;
++  severity: Severity;
++  riskScore: number;
++  status: FindingStatus;
++  owaspCategory: string | null;
++  attackTactic: string | null;
++  attackTechnique: string | null;
++  actor: string | null;
++  sourceIp: string | null;
++  affectedAccountId: number | null;
++  occurrenceCount: number;
++  firstSeen: string;
++  lastSeen: string;
++  evidence: string | null;
++  intel: string | null;
++}
++
++/** Noise metrics since the backend started. */
++export interface SecuritySummary {
++  rawEvents: number;
++  detections: number;
++  suppressedDuplicates: number;
++  findingsCreated: number;
++  activeFindings: number;
++  noiseReductionPct: number;
++}
++
++export interface VulnerabilityFinding {
++  cveId: string;
++  component: string;
++  version: string;
++  cvss: number;
++  epss: number;
++  knownExploited: boolean;
++  loadedAtRuntime: boolean;
++  internetExposed: boolean;
++}
++
++export interface PrioritizedVulnerability {
++  finding: VulnerabilityFinding;
++  priorityScore: number;
++  tier: string;
++  rationale: string;
++}
+diff --git a/ledger-web/src/app/security/security-page/security-page.css b/ledger-web/src/app/security/security-page/security-page.css
+new file mode 100644
+index 0000000..ec130b9
+--- /dev/null
++++ b/ledger-web/src/app/security/security-page/security-page.css
+@@ -0,0 +1,220 @@
++.security-page {
++  max-width: 1100px;
++  margin: 0 auto;
++  padding: 1.5rem;
++  display: grid;
++  gap: 1.25rem;
++  color: #14213d;
++}
++
++.hero {
++  display: flex;
++  justify-content: space-between;
++  align-items: end;
++  gap: 1rem;
++  padding: 1.5rem 1.75rem;
++  border: 1px solid #d6dce8;
++  border-radius: 8px;
++  background: linear-gradient(135deg, #ffffff 0%, #eef4ff 100%);
++}
++
++.hero__eyebrow {
++  margin: 0 0 0.5rem;
++  color: #5f6f88;
++  font-size: 0.85rem;
++  text-transform: uppercase;
++}
++
++.hero__title {
++  margin: 0;
++  font-size: clamp(2rem, 4vw, 3rem);
++  line-height: 1.05;
++  font-weight: 700;
++}
++
++.hero__copy {
++  margin: 0.6rem 0 0;
++  max-width: 42rem;
++  color: #5a677d;
++}
++
++.hero__meta {
++  display: grid;
++  grid-template-columns: repeat(2, minmax(120px, 1fr));
++  gap: 0.75rem;
++  min-width: min(100%, 340px);
++}
++
++.metric {
++  display: grid;
++  gap: 0.35rem;
++  padding: 0.9rem 1rem;
++  border: 1px solid #d6dce8;
++  border-radius: 8px;
++  background: rgba(255, 255, 255, 0.82);
++}
++
++.metric__label {
++  font-size: 0.75rem;
++  text-transform: uppercase;
++  color: #6a7890;
++}
++
++.metric__value {
++  font-size: 1.25rem;
++  font-weight: 700;
++  color: #215cff;
++}
++
++.panel {
++  padding: 1.25rem 1.5rem;
++  border: 1px solid #d6dce8;
++  border-radius: 8px;
++  background: #fff;
++}
++
++.section-head {
++  display: flex;
++  justify-content: space-between;
++  align-items: baseline;
++  gap: 0.75rem;
++  margin-bottom: 1rem;
++}
++
++.section-head h2 {
++  margin: 0;
++  font-size: 1.25rem;
++}
++
++.section-head__hint {
++  color: #5a677d;
++  font-size: 0.9rem;
++}
++
++.section-actions {
++  display: flex;
++  align-items: center;
++  gap: 1rem;
++}
++
++.toggle {
++  display: flex;
++  align-items: center;
++  gap: 0.4rem;
++  font-size: 0.9rem;
++  color: #5a677d;
++}
++
++.secondary-button {
++  padding: 0.4rem 0.8rem;
++  border: 1px solid #c3cde0;
++  border-radius: 6px;
++  background: #fff;
++  color: #14213d;
++  cursor: pointer;
++}
++
++.secondary-button:disabled {
++  opacity: 0.6;
++  cursor: default;
++}
++
++.state {
++  margin: 0;
++  color: #5a677d;
++}
++
++.state--error {
++  color: #b42318;
++}
++
++.findings {
++  list-style: none;
++  margin: 0;
++  padding: 0;
++  display: grid;
++  gap: 0.75rem;
++}
++
++.finding {
++  display: grid;
++  grid-template-columns: 64px 1fr auto;
++  gap: 1rem;
++  padding: 0.9rem 1rem;
++  border: 1px solid #d6dce8;
++  border-left-width: 6px;
++  border-radius: 8px;
++}
++
++.finding.severity-low { border-left-color: #8aa4d6; }
++.finding.severity-medium { border-left-color: #e0a100; }
++.finding.severity-high { border-left-color: #e5642b; }
++.finding.severity-critical { border-left-color: #b42318; }
++
++.finding__score {
++  display: grid;
++  place-items: center;
++  font-size: 1.6rem;
++  font-weight: 700;
++}
++
++.finding__top {
++  display: flex;
++  flex-wrap: wrap;
++  align-items: center;
++  gap: 0.5rem;
++}
++
++.finding__evidence {
++  margin: 0.35rem 0;
++}
++
++.finding__meta {
++  margin: 0.15rem 0 0;
++  font-size: 0.85rem;
++  color: #5a677d;
++}
++
++.finding__actions {
++  display: flex;
++  flex-direction: column;
++  gap: 0.4rem;
++  justify-content: center;
++}
++
++.chip {
++  padding: 0.1rem 0.5rem;
++  border-radius: 999px;
++  background: #eef2fa;
++  font-size: 0.75rem;
++  text-transform: uppercase;
++}
++
++.chip--count {
++  background: #fff1d6;
++}
++
++.vulns {
++  width: 100%;
++  border-collapse: collapse;
++  font-size: 0.9rem;
++}
++
++.vulns th,
++.vulns td {
++  padding: 0.55rem 0.6rem;
++  border-bottom: 1px solid #e6eaf2;
++  text-align: left;
++  vertical-align: top;
++}
++
++@media (max-width: 720px) {
++  .hero {
++    flex-direction: column;
++    align-items: stretch;
++  }
++
++  .finding {
++    grid-template-columns: 1fr;
++  }
++}
+diff --git a/ledger-web/src/app/security/security-page/security-page.html b/ledger-web/src/app/security/security-page/security-page.html
+new file mode 100644
+index 0000000..7c12ca3
+--- /dev/null
++++ b/ledger-web/src/app/security/security-page/security-page.html
+@@ -0,0 +1,131 @@
++<div class="security-page">
++  <header class="hero">
++    <div>
++      <p class="hero__eyebrow">Threat observability · prototype</p>
++      <h1 class="hero__title">Security findings</h1>
++      <p class="hero__copy">
++        Raw API events are detected by rules, enriched with threat intel and asset context,
++        scored, and deduplicated into a short list an analyst can actually work through.
++      </p>
++      <p class="hero__copy"><a routerLink="/accounts">← Back to accounts</a></p>
++    </div>
++    @if (store.summary(); as summary) {
++      <div class="hero__meta">
++        <div class="metric">
++          <span class="metric__label">Raw events</span>
++          <span class="metric__value">{{ summary.rawEvents }}</span>
++        </div>
++        <div class="metric">
++          <span class="metric__label">Findings opened</span>
++          <span class="metric__value">{{ summary.findingsCreated }}</span>
++        </div>
++        <div class="metric">
++          <span class="metric__label">Duplicates folded</span>
++          <span class="metric__value">{{ summary.suppressedDuplicates }}</span>
++        </div>
++        <div class="metric">
++          <span class="metric__label">Noise reduction</span>
++          <span class="metric__value">{{ summary.noiseReductionPct }}%</span>
++        </div>
++      </div>
++    }
++  </header>
++
++  <section class="panel">
++    <div class="section-head">
++      <h2>Findings</h2>
++      <div class="section-actions">
++        <label class="toggle">
++          <input type="checkbox" [checked]="hideResolved()" (change)="toggleResolved()" />
++          Hide resolved
++        </label>
++        <button type="button" class="secondary-button" (click)="refresh()" [disabled]="store.loading()">
++          Refresh
++        </button>
++      </div>
++    </div>
++
++    @if (store.loading() && store.findings().length === 0) {
++      <p class="state">Loading findings…</p>
++    } @else if (store.error()) {
++      <p class="state state--error">{{ store.error() }}</p>
++    } @else if (visibleFindings().length === 0) {
++      <p class="state">No findings. Generate some traffic with docs/threat-demo.sh.</p>
++    } @else {
++      <ul class="findings">
++        @for (finding of visibleFindings(); track finding.id) {
++          <li class="finding" [class]="'finding severity-' + finding.severity.toLowerCase()">
++            <div class="finding__score" [attr.aria-label]="'Risk score ' + finding.riskScore">
++              {{ finding.riskScore }}
++            </div>
++            <div class="finding__body">
++              <div class="finding__top">
++                <strong>{{ finding.title }}</strong>
++                <span class="chip chip--severity">{{ finding.severity }}</span>
++                <span class="chip">{{ finding.status }}</span>
++                @if (finding.occurrenceCount > 1) {
++                  <span class="chip chip--count">×{{ finding.occurrenceCount }}</span>
++                }
++              </div>
++              <p class="finding__evidence">{{ finding.evidence }}</p>
++              <p class="finding__meta">
++                {{ finding.ruleId }} · {{ finding.owaspCategory }} ·
++                {{ finding.attackTactic }} / {{ finding.attackTechnique }}
++              </p>
++              <p class="finding__meta">
++                actor {{ finding.actor }} · ip {{ finding.sourceIp }}
++                @if (finding.intel) { · intel {{ finding.intel }} }
++                · last seen {{ finding.lastSeen | date: 'short' }}
++              </p>
++            </div>
++            <div class="finding__actions">
++              @if (finding.status === 'OPEN') {
++                <button type="button" class="secondary-button"
++                        (click)="store.setStatus({ id: finding.id, status: 'ACKNOWLEDGED' })">
++                  Acknowledge
++                </button>
++              }
++              @if (finding.status !== 'RESOLVED') {
++                <button type="button" class="secondary-button"
++                        (click)="store.setStatus({ id: finding.id, status: 'RESOLVED' })">
++                  Resolve
++                </button>
++              }
++            </div>
++          </li>
++        }
++      </ul>
++    }
++  </section>
++
++  <section class="panel">
++    <div class="section-head">
++      <h2>Vulnerability priorities</h2>
++      <span class="section-head__hint">
++        Sample data. Ranked by CVSS, EPSS, known exploitation, exposure and runtime context.
++      </span>
++    </div>
++    <table class="vulns">
++      <thead>
++        <tr>
++          <th>Priority</th>
++          <th>CVE</th>
++          <th>Component</th>
++          <th>CVSS</th>
++          <th>Why</th>
++        </tr>
++      </thead>
++      <tbody>
++        @for (item of store.vulnerabilities(); track item.finding.cveId) {
++          <tr>
++            <td><span class="chip">{{ item.tier }}</span> <small>{{ item.priorityScore }}</small></td>
++            <td>{{ item.finding.cveId }}</td>
++            <td>{{ item.finding.component }} {{ item.finding.version }}</td>
++            <td>{{ item.finding.cvss }}</td>
++            <td>{{ item.rationale }}</td>
++          </tr>
++        }
++      </tbody>
++    </table>
++  </section>
++</div>
+diff --git a/ledger-web/src/app/security/security-page/security-page.spec.ts b/ledger-web/src/app/security/security-page/security-page.spec.ts
+new file mode 100644
+index 0000000..25ee75f
+--- /dev/null
++++ b/ledger-web/src/app/security/security-page/security-page.spec.ts
+@@ -0,0 +1,89 @@
++import { provideHttpClient } from '@angular/common/http';
++import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
++import { ComponentFixture, TestBed } from '@angular/core/testing';
++import { provideRouter } from '@angular/router';
++
++import { Finding, PrioritizedVulnerability, SecuritySummary } from '../../core/models/security';
++import { SecurityPage } from './security-page';
++
++const finding: Finding = {
++  id: 1,
++  ruleId: 'LEDGER-001',
++  title: "Access to another user's account (BOLA)",
++  severity: 'HIGH',
++  riskScore: 90,
++  status: 'OPEN',
++  owaspCategory: 'A01:2025 Broken Access Control',
++  attackTactic: 'Initial Access (TA0001)',
++  attackTechnique: 'T1190 Exploit Public-Facing Application',
++  actor: '7',
++  sourceIp: '203.0.113.66',
++  affectedAccountId: 1,
++  occurrenceCount: 12,
++  firstSeen: '2026-11-08T10:00:00Z',
++  lastSeen: '2026-11-08T10:05:00Z',
++  evidence: 'user 7 GET /api/accounts/1/balance on account 1 owned by user 1 -> HTTP 200',
++  intel: 'MALICIOUS: sample-threat-feed',
++};
++
++const summary: SecuritySummary = {
++  rawEvents: 120,
++  detections: 14,
++  suppressedDuplicates: 11,
++  findingsCreated: 3,
++  activeFindings: 3,
++  noiseReductionPct: 97.5,
++};
++
++const vulnerability: PrioritizedVulnerability = {
++  finding: {
++    cveId: 'CVE-2099-0001',
++    component: 'sample-http-client',
++    version: '1.4.2',
++    cvss: 9.8,
++    epss: 0.92,
++    knownExploited: true,
++    loadedAtRuntime: true,
++    internetExposed: true,
++  },
++  priorityScore: 97,
++  tier: 'P1 - fix now',
++  rationale: 'CVSS 9.8, EPSS 92%, known exploited, internet-exposed, loaded at runtime',
++};
++
++describe('SecurityPage', () => {
++  let fixture: ComponentFixture<SecurityPage>;
++  let http: HttpTestingController;
++
++  beforeEach(async () => {
++    await TestBed.configureTestingModule({
++      imports: [SecurityPage],
++      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
++    }).compileComponents();
++
++    http = TestBed.inject(HttpTestingController);
++    fixture = TestBed.createComponent(SecurityPage);
++    await fixture.whenStable();
++  });
++
++  afterEach(() => http.verify());
++
++  function flushBackend(): void {
++    http.expectOne('/api/security/findings').flush([finding]);
++    http.expectOne('/api/security/summary').flush(summary);
++    http.expectOne('/api/security/vulnerabilities').flush([vulnerability]);
++  }
++
++  it('renders findings, noise metrics and prioritised vulnerabilities', async () => {
++    flushBackend();
++    await fixture.whenStable();
++    fixture.detectChanges();
++
++    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
++    expect(text).toContain('Access to another user');
++    expect(text).toContain('×12');
++    expect(text).toContain('97.5%');
++    expect(text).toContain('CVE-2099-0001');
++    expect(text).toContain('P1 - fix now');
++  });
++});
+diff --git a/ledger-web/src/app/security/security-page/security-page.ts b/ledger-web/src/app/security/security-page/security-page.ts
+new file mode 100644
+index 0000000..bc3a3a7
+--- /dev/null
++++ b/ledger-web/src/app/security/security-page/security-page.ts
+@@ -0,0 +1,29 @@
++import { DatePipe } from '@angular/common';
++import { Component, computed, inject, signal } from '@angular/core';
++import { RouterLink } from '@angular/router';
++import { SecurityStore } from '../security.store';
++
++@Component({
++  selector: 'app-security-page',
++  imports: [RouterLink, DatePipe],
++  templateUrl: './security-page.html',
++  styleUrl: './security-page.css',
++})
++export class SecurityPage {
++  protected readonly store = inject(SecurityStore);
++  protected readonly hideResolved = signal(true);
++
++  protected readonly visibleFindings = computed(() =>
++    this.hideResolved()
++      ? this.store.findings().filter((f) => f.status !== 'RESOLVED')
++      : this.store.findings(),
++  );
++
++  protected toggleResolved(): void {
++    this.hideResolved.update((value) => !value);
++  }
++
++  protected refresh(): void {
++    this.store.load();
++  }
++}
+diff --git a/ledger-web/src/app/security/security.store.ts b/ledger-web/src/app/security/security.store.ts
+new file mode 100644
+index 0000000..d075318
+--- /dev/null
++++ b/ledger-web/src/app/security/security.store.ts
+@@ -0,0 +1,74 @@
++import { inject } from '@angular/core';
++import { patchState, signalStore, withHooks, withMethods, withState } from '@ngrx/signals';
++import { rxMethod } from '@ngrx/signals/rxjs-interop';
++import { catchError, EMPTY, forkJoin, pipe, switchMap, tap } from 'rxjs';
++import { SecurityApi } from '../core/api/security-api';
++import {
++  Finding,
++  FindingStatus,
++  PrioritizedVulnerability,
++  SecuritySummary,
++} from '../core/models/security';
++
++type SecurityState = {
++  findings: Finding[];
++  summary: SecuritySummary | null;
++  vulnerabilities: PrioritizedVulnerability[];
++  loading: boolean;
++  error: string | null;
++};
++
++const initialState: SecurityState = {
++  findings: [],
++  summary: null,
++  vulnerabilities: [],
++  loading: false,
++  error: null,
++};
++
++export const SecurityStore = signalStore(
++  { providedIn: 'root' },
++  withState(initialState),
++  withMethods((store, api = inject(SecurityApi)) => ({
++    load: rxMethod<void>(
++      pipe(
++        tap(() => patchState(store, { loading: true, error: null })),
++        switchMap(() =>
++          forkJoin({
++            findings: api.listFindings(),
++            summary: api.summary(),
++            vulnerabilities: api.vulnerabilities(),
++          }).pipe(
++            tap((data) => patchState(store, { ...data, loading: false })),
++            catchError(() => {
++              patchState(store, { loading: false, error: 'Failed to load security data' });
++              return EMPTY;
++            }),
++          ),
++        ),
++      ),
++    ),
++    setStatus: rxMethod<{ id: number; status: FindingStatus }>(
++      pipe(
++        switchMap(({ id, status }) =>
++          api.updateStatus(id, status).pipe(
++            tap((updated) =>
++              patchState(store, (state) => ({
++                findings: state.findings.map((f) => (f.id === updated.id ? updated : f)),
++              })),
++            ),
++            catchError(() => {
++              patchState(store, { error: 'Failed to update the finding' });
++              return EMPTY;
++            }),
++          ),
++        ),
++      ),
++    ),
++  })),
++  withHooks({
++    onInit(store) {
++      store.load();
++    },
++  }),
++);
+-- 
+2.43.0
+
